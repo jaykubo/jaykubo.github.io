@@ -15,13 +15,21 @@
   noblank: true
 # Uncomment and complete the url below to enable more contact options
 #
-# - type: mastodon
-#   icon: 'fab fa-mastodon'   # icons powered by <https://fontawesome.com/>
-#   url:  ''                  # Fill with your Mastodon account page, rel="me" will be applied for verification
-#
-# - type: linkedin
-#   icon: 'fab fa-linkedin'   # icons powered by <https://fontawesome.com/>
-#   url:  ''                  # Fill with your Linkedin homepage
+- type: linkedin
+  icon: 'fab fa-linkedin'   # icons powered by <https://fontawesome.com/>
+  url:  'https://www.linkedin.com/in/jaykubo'                  # Fill with your Linkedin homepage
+
+- type: mastodon
+  icon: 'fab fa-mastodon'   # icons powered by <https://fontawesome.com/>
+  url:  'https://infosec.exchange/@jek'                  # Fill with your Mastodon account page, rel="me" will be applied for verification
+
+- type: Instagram
+  icon: 'fab fa-instagram'
+  url: 'https://www.instagram.com/jaykubo'
+
+# - type: VSCO
+#   icon: 'fas fa-camera' # VSCO doesn't have a brand icon in FA, use a camera!
+#   url: 'https://vsco.co/jaykubo'
 #
 # - type: stack-overflow
 #   icon: 'fab fa-stack-overflow'
