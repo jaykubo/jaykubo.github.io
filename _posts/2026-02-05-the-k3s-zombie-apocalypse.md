@@ -1,15 +1,13 @@
 ---
 title: "The K3s Zombie Apocalypse: A Global Tale of Pings and Packets"
 date: 2026-02-05 21:00:00 +0900
-categories: [Homelab, Kubernetes]
-tags: [k3s, tailscale, networking, distributed-systems, raspberry-pi, gpu-computing]
+categories: [Infrasturcture, Kubernetes]
+tags: [k3s, tailscale, networking, distributed-systems, infrastructure, raspberry-pi, gpu-computing]
 layout: post
 image:
   path: /assets/img/posts/zombie-apocalypse.png
   alt: Global Kubernetes Cluster Resource
 ---
-
-**(Cue ominous, slightly glitchy synth music)**
 
 In the digital dark corners of my network, a dream was stirring. A dream of a single, mighty Kubernetes brain, humming across continents. From the neon glow of Tokyo to the dusty plains of Austin, from the relentless hum of LA’s data centers to my quiet corner in Torrance – a distributed computing empire. 
 
@@ -107,20 +105,24 @@ GEOGRAPHIC DISTRIBUTION:
 
 | NAME | STATUS | ROLES | AGE | VERSION | INTERNAL-IP | OS-IMAGE | KERNEL-VERSION |
 |:---|:---|:---|:---|:---|:---|:---|:---|
-| hnd-ctrl-01 | Ready | control-plane | 67m | v1.34.3 | 100.67.10.6 | Ubuntu 24.04 | 6.7.0-raspi |
-| hnd-dgx-gpu-01 | Ready | worker | 67m | v1.34.3 | 100.67.10.70 | Ubuntu 24.04 | 6.7.0-nvidia |
-| hnd-fwd-gpu-01 | Ready | worker | 67m | v1.34.3 | 100.67.10.71 | Ubuntu 24.04 | 6.17.0-generic |
-| aus-ctrl-01 | Ready | control-plane | 76m | v1.34.3 | 100.67.20.6 | Ubuntu 24.04 | 6.7.0-raspi |
-| aus-sec-01 | Ready | control-plane | 76m | v1.34.3 | 100.67.20.66 | Kali Linux¹ | 6.7.0-raspi |
-| aus-fwd-gpu-01 | Ready | worker | 67m | v1.34.3 | 100.67.20.70 | Ubuntu 24.04 | 6.17.0-generic |
-| aus-fwd-gpu-02 | Ready | worker | 67m | v1.34.3 | 100.67.20.71 | Ubuntu 24.04 | 6.17.0-generic |
-| aus-nas-01 | Ready | worker | 67m | v1.34.3 | 100.67.20.27 | Ubuntu 24.04 | 6.7.0-raspi |
-| aus-node-02 | Ready | worker | 67m | v1.34.3 | 100.67.20.37 | Ubuntu 24.04 | 6.7.0-raspi |
-| lax-ctrl-01 | Ready | control-plane | 76m | v1.34.3 | 100.67.30.6 | Ubuntu 24.04 | 6.7.0-raspi |
-| lax-fwd-gpu-01 | Ready | worker | 67m | v1.34.3 | 100.67.30.70 | Ubuntu 24.04 | 6.17.0-generic |
-| lax-ser4-gpu-01 | Ready | worker | 67m | v1.34.3 | 100.67.30.71 | Ubuntu 24.04 | 6.7.0-generic |
-| toa-ctrl-01 | Ready | control-plane | 76m | v1.34.3 | 100.67.40.6 | Ubuntu 24.04 | 6.7.0-raspi |
-| toa-fwd-gpu-01 | Ready | worker | 67m | v1.34.3 | 100.67.40.70 | Ubuntu 24.04 | 6.17.0-generic |
+| hnd-ctrl-01 | Ready | control-plane | 12h | v1.34.3 | 100.67.10.6 | Ubuntu 24.04 | 6.7.0-raspi |
+| hnd-dgx-gpu-01 | Ready | worker | 11h | v1.34.3 | 100.67.10.70 | Ubuntu 24.04 | 6.7.0-nvidia |
+| hnd-fwd-gpu-01 | Ready | worker | 11h | v1.34.3 | 100.67.10.71 | Ubuntu 24.04 | 6.17.0-generic |
+| aus-ctrl-01 | Ready | control-plane | 12h | v1.34.3 | 100.67.20.6 | Ubuntu 24.04 | 6.7.0-raspi |
+| aus-sec-01 | Ready | control-plane | 12h | v1.34.3 | 100.67.20.66 | Kali Linux¹ | 6.7.0-raspi |
+| aus-fwd-gpu-01 | Ready | worker | 12h | v1.34.3 | 100.67.20.70 | Ubuntu 24.04 | 6.17.0-generic |
+| aus-fwd-gpu-02 | Ready | worker | 12h | v1.34.3 | 100.67.20.71 | Ubuntu 24.04 | 6.17.0-generic |
+| aus-nas-01 | Ready | worker | 12h | v1.34.3 | 100.67.20.27 | Ubuntu 24.04 | 6.7.0-raspi |
+| aus-node-02 | Ready | worker | 11h | v1.34.3 | 100.67.20.37 | Ubuntu 24.04 | 6.7.0-raspi |
+| aus-node-03 | Ready | worker | 12h | v1.34.3 | 100.67.20.38 | Ubuntu 24.04 | 6.7.0-raspi |
+| aus-node-04 | Ready | worker | 12h | v1.34.3 | 100.67.20.39 | Ubuntu 24.04 | 6.7.0-raspi |
+| lax-ctrl-01 | Ready | control-plane | 12h | v1.34.3 | 100.67.30.6 | Ubuntu 24.04 | 6.7.0-raspi |
+| lax-fwd-gpu-01 | Ready | worker | 11h | v1.34.3 | 100.67.30.70 | Ubuntu 24.04 | 6.17.0-generic |
+| lax-ser4-gpu-01 | Ready | worker | 11h | v1.34.3 | 100.67.30.71 | Ubuntu 24.04 | 6.7.0-generic |
+| lax-node-01 | Ready | worker | 11h | v1.34.3 | 100.67.30.31 | Ubuntu 24.04 | 6.7.0-raspi |
+| lax-node-02 | Ready | worker | 11h | v1.34.3 | 100.67.30.32 | Ubuntu 24.04 | 6.7.0-raspi |
+| toa-ctrl-01 | Ready | control-plane | 12h | v1.34.3 | 100.67.40.6 | Ubuntu 24.04 | 6.7.0-raspi |
+| toa-fwd-gpu-01 | Ready | worker | 11h | v1.34.3 | 100.67.40.70 | Ubuntu 24.04 | 6.17.0-generic |
 
 > **Note on Network Topology:** Internal IPs have been remapped to the `100.67.x.y` range. This is a deliberate nod to the "67" trend.
 >
@@ -136,7 +138,7 @@ For the hardware enthusiasts, here is the verified breakdown of the silicon powe
 
 | Node Name | Hardware / Host | CPU Architecture | GPU / Accelerator | RAM |
 | :--- | :--- | :--- | :--- | :--- |
-| **hnd-dgx-gpu-01** | NVIDIA DGX Spark (Aarch64) | 20-Core (Cortex-X925/A725) | NVIDIA GB10 | 128 GB |
+| **hnd-dgx-gpu-01** | NVIDIA DGX Spark (A.7) | 20-Core (Cortex-X925/A725) | NVIDIA GB10 | 128 GB |
 | **hnd-fwd-gpu-01** | Framework (AMD Ryzen AI Max+) | 32-Core Ryzen AI Max+ 395 | Radeon 8060S | 128 GB |
 | **lax-ser4-gpu-01**| Beelink SER4 | 8-Core Ryzen 7 4700U | Radeon Vega | 16 GB |
 | **toa-ctrl-01** | Raspberry Pi 5 | 4-Core BCM2712 | Broadcom VC7 | 8 GB |
@@ -148,6 +150,7 @@ Our global resource pool now sits at a staggering:
 * **18 Total Nodes**
 * **232 Logic Cores**
 * **~750GB Distributed RAM**
-* **Storage Tiers:** Ranging from `pd-premium` (NVMe) to `pd-archive` (SD/HDD).
-
-**(Fade to black, synth music swells and resolves into a triumphant, slightly weary chord.)**
+* **Storage Tiers:**
+  - `pd-premium` (NVMe): 3x geo-replicated for etcd/databases
+  - `pd-standard` (SSD): 2x replicated for application data
+  - `pd-archive` (NAS): Single-copy for logs, backups, object storage
