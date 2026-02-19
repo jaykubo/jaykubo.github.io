@@ -16,6 +16,8 @@ tags:
   - claude-code
   - ai-tools
   - traefik
+  - youtube
+  - leaflet
 layout: post
 image:
   path: /assets/img/posts/all-seeing-eye.png
@@ -168,7 +170,10 @@ The public path chains through the [existing Cloudflare Tunnel](https://jkubo.co
 | `GET /cameras/austin` | Austin cameras with stale annotations |
 | `GET /cameras/california` | All California cameras |
 | `GET /cameras/california/{1-12}` | Filter by CalTrans district |
+| `GET /search?lat=X&lon=Y&radius=R` | Cameras near a point — R-tree + Haversine, sorted by distance |
 | `GET /image/{region}/{id}` | Proxy live camera image (CORS bypass) |
+| `GET /livecams` | All 33 livecam cameras with resolved YouTube video IDs |
+| `GET /livecams/{region}` | Filter by region (kanto, kansai, chubu, etc.) |
 | `GET /metrics` | Prometheus metrics (port 9090) |
 
 The root handler uses content negotiation: `Accept: text/html` gets the embedded dashboard, everything else gets JSON stats. One endpoint, two personalities.
@@ -179,6 +184,54 @@ The dashboard at `cctv.kub0.xyz` includes a Swagger-style interactive API explor
 
 No external Swagger UI dependency, no OpenAPI spec file, no build step. Just 80 lines of vanilla JS embedded in a Go string constant. The same pattern was added to the ADS-B dashboard for consistency across the cluster's internal tools.
 
+## Point the Eye: Spatial Search
+
+The natural question after "I have 4,158 cameras" is "show me the ones *near me*."
+
+A flat endpoint like `/cameras/california/7` returns everything in LA County — 847 cameras. Useful for analytics, hostile to a map where you've zoomed into a six-block radius. What the intelligence map actually needs is `/search?lat=34.05&lon=-118.24&radius=2` — cameras within 2km of downtown LA, sorted by ascending distance.
+
+The implementation is a textbook R-tree, specifically `github.com/tidwall/rtree`'s generic variant (`RTreeG[Camera]`). Each camera is inserted as a degenerate rectangle — min and max are the same point, `[lon, lat]`. The tree organizes these in a balanced hierarchy so range queries run in O(log n + k) instead of O(n).
+
+```go
+// Camera stored as a point (min == max == the camera's coordinates)
+pt := [2]float64{c.Lon, c.Lat}
+idx.tree.Insert(pt, pt, c)
+```
+
+The search is two-stage:
+
+1. **Bounding box prefilter.** Convert the radius to a lat/lon box (Δlat = R/111, Δlon = R/(111·cos(lat))). The R-tree returns all cameras within the box — fast, approximate, overcounts the corners of the square.
+
+2. **Haversine filter.** For each candidate, compute the exact great-circle distance. Reject cameras that fall inside the box's corners but outside the actual circle.
+
+```go
+a := math.Sin(dLat/2)*math.Sin(dLat/2) +
+    math.Cos(lat1r)*math.Cos(lat2r)*math.Sin(dLon/2)*math.Sin(dLon/2)
+dist := 6371.0 * 2 * math.Atan2(math.Sqrt(a), math.Sqrt(1-a))
+```
+
+At 5km radius near the equator, the bounding box overcounts by up to ~21%. At 4,158 cameras that's microseconds of wasted work. The Haversine pass keeps results exact regardless.
+
+The index is rebuilt after every scrape cycle — both the Austin and California tickers call `buildSpatialIndex(s.austin, s.california)` under the write lock and swap the pointer atomically. Rebuild time at 4k cameras is unmeasurably fast. The search itself runs lock-free: read the index pointer and stale set under the read lock, release, then query.
+
+The response includes `distance_km` per camera (rounded to the meter), full camera fields, and stale annotations:
+
+```json
+{
+  "cameras": [
+    { "camera_id": "D7-1234", "region": "california", "lat": 34.052, "lon": -118.241,
+      "distance_km": 0.182, "stale": false },
+    ...
+  ],
+  "count": 14,
+  "lat": 34.05,
+  "lon": -118.24,
+  "radius_km": 2
+}
+```
+
+Parameters: `lat` and `lon` (required), `radius` in km (0–50, default 1.0), `limit` (1–500, default 50), and an optional `region` filter for when you only want Austin or California results.
+
 ## The Frontend: Clickable Everything
 
 The kub0.ai VISINT module evolved from a static placeholder to a fully interactive camera explorer:
@@ -187,6 +240,47 @@ The kub0.ai VISINT module evolved from a static placeholder to a fully interacti
 - **Client-side caching**: Camera data stored in a JavaScript variable, refreshed every 5 minutes. Filter clicks use cached data — instant.
 - **Clickable drill-down**: Click California → districts appear. Click a district → sample grid filters to that district. Click Austin → districts hide, Austin cameras shown. Click again to deselect. The "Clear Filter" button resets to the default 4+4 sample view.
 - **Stale filtering**: Sample feeds exclude cameras with `stale: true`. No more grids full of "TEMPORARILY UNAVAILABLE" placeholders.
+
+## The Livecam Extension
+
+The traffic camera system archives government infrastructure. What it couldn't do was show you a city live. Adding 33 YouTube livestream cameras — Shibuya Scramble, Mount Fuji at dawn, Dotonbori at midnight — required solving three separate YouTube problems inside the same binary.
+
+**The embed problem.** YouTube's `live_stream?channel=CHANNEL_ID` format is intermittently broken — some channels show archived videos, some show nothing. The fix: resolve video IDs server-side and embed with `youtube.com/embed/{video_id}`.
+
+**The resolution problem.** HTML scraping fails from data center IPs — YouTube serves a JavaScript shell with a `canonical` tag whose `href` is literally `"undefined"`. The oEmbed API doesn't handle live channels. The YouTube Data API works but requires API keys and quota management for 33 requests every 10 minutes.
+
+What actually works: RSS feeds.
+
+```
+https://www.youtube.com/feeds/videos.xml?channel_id={id}
+```
+
+No authentication. No quota. Works from every IP on earth, including Raspberry Pis behind Tailscale. The first `<yt:videoId>` in the feed is the most recent upload — for 24/7 livestream channels, that's the live stream. One regex, 33 out of 33 resolved.
+
+```go
+var rssVideoIDRe = regexp.MustCompile(`<yt:videoId>([a-zA-Z0-9_-]{11})</yt:videoId>`)
+```
+
+**The embed restriction problem.** With video IDs resolved, the standard `youtube.com/embed` player threw Error 153 — channel owner has restricted embedding. Half the Japanese livestream channels have it disabled for `youtube.com`. The fix is one word: `youtube-nocookie.com`. YouTube's privacy-enhanced mode domain bypasses the restriction. Every channel that blocked `youtube.com/embed` allows `youtube-nocookie.com/embed`.
+
+The resolver runs as a background goroutine every 10 minutes with a dedicated HTTP client. The `internal/livecam` package has zero imports from the camera scraper, storage, or proxy code — architecturally decoupled but operationally bundled in the same binary.
+
+### The 33 Cameras
+
+| Region | Count | Highlights |
+|--------|-------|------------|
+| Kanto | 13 | Shibuya Scramble, Shinjuku, Odaiba, Yokohama Bay Bridge |
+| Chubu | 7 | Mount Fuji (multiple angles), Nagoya expressway, Kanazawa |
+| Kansai | 6 | Dotonbori, Kobe Port Tower, Nara deer park |
+| Kyushu | 2 | Fukuoka, Kumamoto |
+| Hokkaido | 2 | Sapporo, Otaru Canal |
+| Shikoku | 1 | Matsuyama |
+| Chugoku | 1 | Hiroshima Peace Memorial |
+| Tohoku | 1 | Sendai |
+
+Each entry carries the channel ID (for RSS resolution), a fallback video ID, bilingual names, coordinates, and region tags. The resolver overwrites the fallback on every cycle — if RSS fails, the previous known-good ID persists.
+
+Click a pink marker on the [intelligence map](https://jkubo.com/posts/the-intelligence-map/). A Leaflet popup opens with the camera name and a YouTube thumbnail with a play button overlay. Click the thumbnail — the `<img>` swaps to an `<iframe>` with autoplay via `youtube-nocookie.com`. Shibuya crossing at 2am, inline, live.
 
 ## Lessons Learned
 
@@ -204,10 +298,17 @@ The kub0.ai VISINT module evolved from a static placeholder to a fully interacti
 
 7. **Content negotiation is underrated.** Serving HTML to browsers and JSON to API clients from the same endpoint eliminates an entire nginx sidecar.
 
+8. **RSS feeds are YouTube's most reliable public API.** No auth, no quota, no rate limits at 33 requests per 10 minutes. For 24/7 livestream channels, the feed's first entry is always the live stream.
+
+9. **`youtube-nocookie.com` bypasses embed restrictions.** Many channels that block `youtube.com/embed` allow the privacy-enhanced domain. One subdomain difference, all 33 cameras working.
+
+10. **R-trees are exactly the right tool for proximity queries.** Bounding-box prefilter via the tree, exact Haversine for the corners — two passes, lock-free after pointer read. Rebuilding the full index on each scrape costs nothing at 4k entries and eliminates any stale-state bugs from incremental updates.
+
 ## Current State
 
 ```
 Cameras:      4,158 (788 Austin + 3,370 California)
+Livecams:     33 YouTube livestreams across 8 regions of Japan
 Stale:        ~391 (dedup-identified offline/static cameras)
 Archive rate: ~3,800 images/cycle, 12 cycles/hour
 Dedup saving: ~112,000 skipped uploads/day
@@ -215,10 +316,10 @@ Storage:      ~25-35 GB/day effective (vs ~72 GB/day naive)
 Cycle time:   ~2m 21s (was 7+ minutes)
 Image size:   ~10MB (scratch container)
 Memory:       ~64MB typical, 256MB limit
+Spatial index: R-tree, 4,158 points, rebuilt each scrape cycle
+Search params: radius 0–50km, limit 1–500, optional region filter
 ```
 
-The cluster's peripheral vision is online. 4,158 cameras across two states, archived with hash dedup, served over a public API, and visualized on a dashboard that loads in under a second. The Python prototype served its purpose — and then, mercifully, it was retired to `_prototype/`.
+The cluster's peripheral vision is online. 4,158 traffic cameras archived, 33 cities streaming live — government infrastructure and YouTube, unified in the same binary.
 
-*All sources are publicly accessible traffic cameras provided by municipal and state agencies.*
-
-Next: teaching the cluster to actually *see* what these cameras are showing. But that's a story for another post.
+*All sources are publicly accessible traffic cameras provided by municipal and state agencies. YouTube livestreams are embedded via the public RSS feed API.*
