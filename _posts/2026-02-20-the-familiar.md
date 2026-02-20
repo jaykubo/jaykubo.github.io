@@ -178,6 +178,27 @@ The difference matters. `vfs` copies every layer fully on every pull — a 2.5GB
 hello from inside k8s
 ```
 
+## Routing Traffic
+
+The cluster already runs a Mullvad VPN proxy pool — six gluetun instances spread across two nodes, each with a different WireGuard keypair and Mullvad exit. The CCTV scraper and ADS-B aggregator use it to avoid IP bans on the data sources they poll. JupyterLab now taps the same pool.
+
+The design is deliberately selective. A full VPN killswitch — iptables routing all pod traffic through WireGuard, the pattern the blockchain nodes use for Tor — would break kubectl, Helm, the Forgejo in-cluster URL rewrite, everything. What's useful is explicit per-request routing: send *this* curl through Mullvad, send *that* curl through Tor, compare results.
+
+```
+%proxy                      # show usage
+%proxy mullvad              # random endpoint from the pool
+%proxy mullvad 2            # specific endpoint for comparison
+%proxy tor                  # Tor SOCKS5 sidecar
+%proxy off                  # back to node IP
+%proxy status               # show current proxy + exit IP
+```
+
+Shell equivalents — `proxy-mullvad`, `proxy-tor`, `proxy-off`, `proxy-status` — are sourced in `.bashrc` for the same workflow in a terminal tab.
+
+Tor runs as an optional sidecar: `tor.enabled=true` in Helm values adds a `tor-gateway` container sharing the pod's network namespace. No iptables killswitch — the SOCKS5 proxy sits at `127.0.0.1:9050` and you route to it explicitly. The Mullvad side needs no new infrastructure at all: `mullvad.proxySecretName` points at an existing cluster secret, and `PROXY_URLS` arrives as an environment variable. The magic reads it at call time.
+
+The original use case: reproducing rate-limit behavior that only manifests under specific exit IPs, without SSH tunneling out of the cluster to a separate machine.
+
 ## The Loop
 
 The public image has no credentials — it knows nothing about this cluster's git server, registry tokens, or SSH keys. Credentials arrive at pod startup via Kubernetes Secrets and `postStart` hooks: gitconfig and SSH key for Forgejo, registry auth for GHCR. The gitconfig includes a URL rewrite so cloning by the external Forgejo URL silently routes through the internal service.
@@ -203,5 +224,15 @@ It's not an assistant sidebar. It's not a chat window bolted onto an IDE. It's a
 Claude runs with `bypassPermissions` enabled — it can execute commands, read files, write code, and push changes without stopping to ask. That's the autonomous mode. What's missing is the notification layer: when Claude is running unattended and hits something that needs a human decision, something has to wake you up. Hooks are the next ligament.
 
 The chart and image are public at [kub0-ai/jupyterlab-claude](https://github.com/kub0-ai/jupyterlab-claude). `v0.1.0` is tagged on GitHub. Anyone can install it, point it at their own git server, bring their own registry credentials, and get the same familiar in their own cluster. The binding pattern isn't specific to this stack — it's just Claude Code CLI, IPython, and a UUID.
+
+---
+
+Going public has a short grace period for mistakes. Within hours of tagging `v0.1.0` and pushing to GitHub, the initial commit surfaced in the history — `chart/Chart.yaml` had been authored with the internal Forgejo URL as the chart's `home` and `sources` fields. A later commit had corrected it. The file was clean. The history wasn't.
+
+The fix was blunt. The repo was six hours old, fifteen commits deep, sole developer. `git checkout --orphan clean-main`, stage everything, single commit, delete the old branch, force-push to both remotes. `v0.1.0` tag recreated on the new commit. History gone — because there was no history worth keeping.
+
+The defense is a pre-push hook that runs before anything leaves the machine. It scans every commit in the push diff for patterns: internal domains, Tailscale IP ranges, vault path fragments. Catches it before it becomes a six-hour incident. The template propagates automatically to new repos via `git config --global init.templateDir`.
+
+Squashing for history-scrubbing is unusual — normally you'd use `git filter-repo` to rewrite specific strings across an intact history. But for a fresh solo project, a clean single commit is equivalent to "here's the current state." Commit history is for collaboration and archaeology. Neither applies yet.
 
 After that: local inference. An Ollama deployment on `aus-fwd-gpu-02` — the same Austin node the Forgejo Actions runner now lives on, with 96GB of GPU RAM already carved out in BIOS. Not waiting for a job — waiting for a model. The training starts now.
