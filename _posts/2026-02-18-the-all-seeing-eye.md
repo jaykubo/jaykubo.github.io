@@ -280,7 +280,7 @@ The resolver runs as a background goroutine every 10 minutes with a dedicated HT
 
 Each entry carries the channel ID (for RSS resolution), a fallback video ID, bilingual names, coordinates, and region tags. The resolver overwrites the fallback on every cycle — if RSS fails, the previous known-good ID persists.
 
-Click a pink marker on the [intelligence map](https://jkubo.com/posts/the-intelligence-map/). A Leaflet popup opens with the camera name and a YouTube thumbnail with a play button overlay. Click the thumbnail — the `<img>` swaps to an `<iframe>` with autoplay via `youtube-nocookie.com`. Shibuya crossing at 2am, inline, live.
+Click a pink marker on the map. A Leaflet popup opens with the camera name and a YouTube thumbnail with a play button overlay. Click the thumbnail — the `<img>` swaps to an `<iframe>` with autoplay via `youtube-nocookie.com`. Shibuya crossing at 2am, inline, live.
 
 ## Lessons Learned
 
