@@ -2,8 +2,8 @@
 title: "The All-Seeing Eye: 4,158 Traffic Cameras and the Art of Not Storing Garbage"
 date: 2026-02-18 14:00:00 +0900
 categories:
+  - Data
   - Infrastructure
-  - Kubernetes
 tags:
   - cctv
   - go

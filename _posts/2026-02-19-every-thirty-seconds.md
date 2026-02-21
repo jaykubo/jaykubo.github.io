@@ -2,8 +2,8 @@
 title: "Every Thirty Seconds: Teaching a Cluster to Listen to the Sky"
 date: 2026-02-19 14:00:00 +0900
 categories:
+  - Data
   - Infrastructure
-  - Kubernetes
 tags:
   - adsb
   - k3s

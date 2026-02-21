@@ -1,7 +1,9 @@
 ---
 title: "Prometheus Unbound: Stealing Fire from a Burning Cluster"
 date: 2026-02-12 12:00:00 +0900
-categories: [Infrastructure, Kubernetes, Observability]
+categories:
+  - Observability
+  - Infrastructure
 tags: [k3s, mimir, loki, grafana, minio, rustfs, observability, tailscale]
 layout: post
 image:

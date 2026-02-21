@@ -1,7 +1,9 @@
 ---
 title: "The 16GB Panini: Sealing a Subnet with Airgap-Tight Security"
 date: 2026-01-30 20:00:00 +0900
-categories: [Networking, Security]
+categories:
+  - Networking
+  - Security
 tags: [technitium, raspberry-pi, dns, infrastructure, opsec]
 layout: post
 image:

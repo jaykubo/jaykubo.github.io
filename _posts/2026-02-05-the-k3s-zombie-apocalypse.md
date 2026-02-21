@@ -1,7 +1,9 @@
 ---
 title: "The K3s Zombie Apocalypse: A Global Tale of Pings and Packets"
 date: 2026-02-05 21:00:00 +0900
-categories: [Infrasturcture, Kubernetes]
+categories:
+  - Infrastructure
+  - Kubernetes
 tags: [k3s, tailscale, networking, distributed-systems, infrastructure, raspberry-pi, gpu-computing]
 layout: post
 image:

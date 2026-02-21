@@ -2,8 +2,8 @@
 title: "The Familiar: Binding an AI to a Jupyter Kernel"
 date: 2026-02-20 14:00:00 +0900
 categories:
-  - Infrastructure
-  - Kubernetes
+  - AI
+  - Platform
 tags:
   - jupyterlab
   - claude-code
