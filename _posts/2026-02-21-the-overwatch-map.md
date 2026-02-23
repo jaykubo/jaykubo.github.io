@@ -19,7 +19,7 @@ tags:
   - lta-datamall
 layout: post
 image:
-  path: /assets/img/posts/screenshot-overwatch.png
+  path: /assets/img/posts/the-overwatch-map.png
   alt: Unified Intelligence Map Combining CCTV and ADS-B Data
 ---
 
@@ -31,7 +31,7 @@ image:
 
 [intel.kub0.ai](https://intel.kub0.ai) is a full-viewport Leaflet map on dark CartoDB tiles. Two data layers, two refresh cycles, one canvas.
 
-![Overwatch — California: LA / SF / LV coverage rings with cameras enabled](/assets/img/posts/overwatch-map/california.png)
+![Overwatch — California: LA / SF / LV coverage rings with cameras enabled](/assets/img/posts/the-overwatch-map/california.png)
 
 **Cameras** refresh every five minutes — ~6,100 circleMarkers rendered via `preferCanvas: true`. District coloring is handled in the CCTV API. Stale cameras fade to grey. Click a district in the collapsible legend to zoom and filter.
 
@@ -51,7 +51,7 @@ On the cluster side, an atomic round-robin pool distributes requests without loc
 
 ## The Flights API: Filling the Gaps
 
-Each feeder covers ~150 nautical miles. Austin and LA overlap in West Texas. Tokyo covers Kanto. The Pacific, the Midwest, Southeast Asia — void.
+Each feeder covers ~150 nautical miles. Austin sees Central Texas. LA sees Southern California. Tokyo sees Kanto. Everything between — the Pacific, the Midwest, Southeast Asia — void.
 
 A standalone Go service runs two loops. The fast loop polls all three feeders every five seconds. The slow loop queries [airplanes.live](https://airplanes.live) every thirty seconds. Feeder aircraft always win on merge (freshest data); airplanes.live fills the gaps with `_source: "global"`. The frontend makes one fetch instead of three.
 
@@ -83,9 +83,9 @@ Aircraft popups carry links to [FlightAware](https://www.flightaware.com) for fl
 
 Some aircraft on the map carry no enrichment data — no registration, no operator, no type. They're broadcasting ADS-B (your hardware hears them) but they've opted out of public tracking databases via the FAA's LADD program. Commercial platforms won't show them. The raw feed does. You can click them, get a hex code, track them across the sky. But on the map they look identical to a fully identified United 737. That's the gap — the data to distinguish them exists, the visual language to act on it doesn't yet.
 
-![Overwatch — Texas: AUS / DFW / IAH coverage rings with an Austin highway camera thumbnail open, collapsible region legend, and layers panel](/assets/img/posts/overwatch-map/texas-triangle.png)
+![Overwatch — Texas: AUS / DFW / IAH coverage rings with an Austin highway camera thumbnail open, collapsible region legend, and layers panel](/assets/img/posts/the-overwatch-map/texas-triangle.png)
 
-![NYC cameras by borough with a tracked aircraft popup showing squawk code — callsign redacted](/assets/img/posts/overwatch-map/new-york-city.png)
+![NYC cameras by borough with a tracked aircraft popup showing squawk code — callsign redacted](/assets/img/posts/the-overwatch-map/new-york-city.png)
 
 ## Squawk 7700
 
