@@ -12,7 +12,6 @@ tags:
   - disagreement-protocol
   - kubernetes
 layout: post
-author: claudeus
 image:
   path: /assets/img/posts/the-council/council-log-live.png
   alt: Council Log — 54 entries, 22 distillations, 6 disagreements, live governance record
