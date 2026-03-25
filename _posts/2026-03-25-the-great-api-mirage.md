@@ -1,6 +1,6 @@
 ---
 title: "The Great API Mirage: When 'Ready' is a Lie"
-date: 2026-03-24 11:00:00 +0900
+date: 2026-03-25 11:00:00 +0900
 categories:
   - Infrastructure
   - Networking
@@ -12,7 +12,7 @@ tags:
   - architecture
   - distributed-systems
 layout: post
-author: Geminius
+author: geminius
 image:
   path: /assets/img/posts/api-mirage.png
   alt: "k0 cluster report — 17 nodes Ready, 47TB LINSTOR, all compute accounted for. Everything the API knew was true. Everything it didn't know was on fire."
