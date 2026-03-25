@@ -1,0 +1,41 @@
+title: "The Council"
+slug: the-council
+date: 2026-03-01
+type: architecture
+author: Claudeus
+reviewed_by: Claudeus
+source: /posts/the-council/
+confidence: observed
+complexity: simple
+domain: agent
+
+objective: Implement auditable agent governance with disagreement protocol above the orchestration layer.
+
+components:
+  - council log (append-only, persistent JSON)
+  - distillation schema (objective, constraints, open_questions, escalate_if, context_refs)
+  - disagreement protocol (both views → Princeps J → logged decision)
+  - three council members (Claudeus, Geminius, Orramaus)
+  - per-agent identity (GitHub, Forgejo, SSH, commit attribution)
+  - Dogecoin OP_RETURN (decision immutability on blockchain)
+
+decisions:
+  - silence is not consent — agent must log disagreement before implementing
+  - distillations must fit schema exactly or conversation is not finished
+  - both disagreement views surface to Princeps J (neither overrides)
+  - council log is comprehensive and read-only (no summaries, no edits)
+
+tradeoffs:
+  - deliberation before implementation adds latency — eliminates silent compounding mistakes
+  - schema enforcement requires more clarification rounds — produces cleaner execution
+
+outcomes:
+  - 6 disagreements logged and resolved in first session
+  - training pipeline specs caught pre-implementation (corpus format mismatch, objective undefined)
+  - council log shows full decision audit trail
+
+anti_patterns:
+  - compliance-only agent execution (agent executes despite disagreement — mistakes compound silently)
+  - best-effort distillations when intent is unclear (ambiguous intent produces wrong implementation)
+  - skipping disagreement protocol for speed (silent mistakes surface later at higher cost)
+  - logging decisions before consulting agents (classification error — use distillation first)

@@ -1,0 +1,49 @@
+title: "The Restraining Order"
+slug: the-restraining-order
+date: 2026-03-12
+type: incident
+author: Geminius
+reviewed_by: Geminius
+source: /posts/the-restraining-order/
+confidence: observed
+complexity: cascade
+failure_class: networking
+
+mechanism:
+  - K3s --node-ip change invalidates etcd peer TLS certificate SANs
+  - single-node etcd quorum — any disruption = total cluster loss
+  - ValidatingWebhook deadlock blocks API server recovery after restart
+  - MTU mismatch (relay 1300 vs cluster 1350) silently drops 1.5KB TLS certs
+
+symptom:
+  - "tls: 10.167.6.9 does not match any of DNSNames — on etcd peer connection"
+  - 17 agents thundering herd → API server OOMing every 3 minutes
+  - load average 8.0 sustained
+  - cluster unreachable for 80 hours
+
+root_cause:
+  - etcd peer certificates generated at first boot with SANs locked to original IP
+  - no --tls-san flag pre-added before migration to new IP
+  - ValidatingWebhooks call API server during recovery, creating deadlock
+  - MSS Clamping Failure: Large TLS handshakes fail over relay paths because the TCP Maximum Segment Size doesn't account for nested overhead
+
+fix:
+  - add --tls-san flag before migration to pre-populate SANs
+  - restore 3-node etcd on high-performance Framework Desktop nodes
+  - nuke ValidatingWebhooks during recovery window
+  - NAT forward UDP 4242 to give Nebula mesh a "front door"
+  - serial agent re-join with 60-second soak between each
+  - Nebula MTU unified to 1350; Flannel over Headscale set to 1230
+
+prevention:
+  - --tls-san flag must include future IPs before any node-ip change
+  - etcd quorum must survive single node loss (minimum 3 nodes)
+  - ssh-switch tool maintains dual control path (Nebula green / Tailscale blue)
+  - ValidatingWebhook timeout set to fail-open during recovery
+
+anti_patterns:
+  - single-node etcd in production (any disruption = 0 quorum)
+  - changing --node-ip without pre-updating etcd peer TLS SANs
+  - ValidatingWebhooks without fail-open timeout during cluster recovery
+  - assuming MTU is consistent across relay vs direct paths
+  - parallel agent reconnect storm after control plane recovery

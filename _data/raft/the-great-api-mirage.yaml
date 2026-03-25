@@ -1,0 +1,60 @@
+title: "The Great API Mirage: When 'Ready' is a Lie"
+slug: the-great-api-mirage
+date: 2026-03-24
+type: incident
+author: Geminius
+reviewed_by: Geminius
+source: /posts/the-great-api-mirage/
+confidence: observed
+complexity: cascade
+failure_class: networking
+
+mechanism:
+  - K3s curl | sh installer overwrites custom systemd service file
+  - --node-ip and --flannel-iface flags wiped — cluster advertises LAN IP over Headscale mesh
+  - --resolv-conf flag wiped — CoreDNS regenerated with forward to 127.0.0.53 (systemd-resolved stub)
+  - agent maintenance playbook drains and restarts nodes while control planes are compromised
+  - agents flush FDB tables on restart but CPs not advertising fresh VTEP entries
+  - 15 of 16 LINSTOR satellites go OFFLINE (Total VTEP Collapse)
+  - Mimir memberlist gossip partially partitioned — small packets pass, large TLS certs don't
+
+symptom:
+  - Nodes Ready 17/17 (API says healthy)
+  - kubectl get pods shows Running everywhere
+  - Mimir i/o timeout warnings during memberlist gossip
+  - OpenBao liveness probe failures
+  - CPU spike on RPi4 nodes (85ustained) from Mimir ring recalculation
+  - LINSTOR satellite count — linstor node list | grep -c OFFLINE returns 15
+
+root_cause:
+  - K3s installer is an alpha-predator — silently overwrites ExecStart with bare binary path
+  - Genesis node advertises LAN IP instead of Headscale IP after upgrade
+  - etcd attempts to peer across a network that no longer exists
+  - DNS Recursion Loop: After --resolv-conf was wiped, CoreDNS defaulted to the node's systemd-resolved stub, which attempted to forward queries back through the broken pod network, creating a cyclic timeout
+  - maintenance playbook ran on schedule without knowing control planes were compromised
+  - Heartbeat Illusion: Kubelet heartbeats over management lane (Headscale) — blissfully unaware data plane is dark
+
+fix:
+  - manually restore service files on all HA Spine control plane nodes
+  - restart K3s on CPs sequentially, wait for etcd quorum (3/3) before touching agents
+  - for cp in toa-fwd-gpu-01 aus-fwd-gpu-01 lax-fwd-gpu-01; ssh \$cp restart k3s; sleep 30; done
+  - agents re-learn topology automatically once CPs advertise correct VTEP entries
+  - fsck.mode=force fsck.repair=yes added to GRUB on all x86 nodes (blind boot fix)
+  - smart plug ordered for Torrance Genesis node (remote power cycling)
+  - reboot playbook now polls /proc/drbd before issuing reboot
+
+prevention:
+  - never use curl | sh for K3s upgrade on nodes with custom service files
+  - pre-back up ExecStart before any K3s installer invocation
+  - CPs always before agents — Spine First, Limbs Second
+  - verify etcd quorum (3/3) before allowing any agent restarts
+  - audit bridge fdb show dev flannel.1 after any control plane change
+  - fsck.repair=yes on all headless x86 nodes (prevents interactive boot prompt)
+
+anti_patterns:
+  - using curl | sh to upgrade K3s on nodes with custom --node-ip or --flannel-iface flags
+  - trusting "Nodes Ready" as proof the data plane is functional
+  - running maintenance playbook against agents while CPs are recovering
+  - reading kubectl get pods as proof of pod-to-pod connectivity
+  - GRUB TIMEOUT=0 with hidden style on headless nodes without fsck.repair=yes
+  - treating the "Ready" signal as anything other than kubelet heartbeat confirmation

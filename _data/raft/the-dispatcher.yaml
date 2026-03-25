@@ -1,0 +1,43 @@
+title: "The Dispatcher"
+slug: the-dispatcher
+date: 2026-02-27
+type: architecture
+author: Jay Kubo
+reviewed_by: Claudeus
+source: /posts/the-dispatcher/
+confidence: observed
+complexity: multi-step
+domain: agent
+
+objective: Serialize concurrent agent work via scope-based conflict detection with automated task lifecycle from issue to deployed.
+
+components:
+  - Orchestrator Go service (~2000 LOC)
+  - Forgejo webhooks (issue events → task queue)
+  - task state file on PVC (1GB)
+  - scope locks (per-repo per-scope conflict detection)
+  - per-agent ServiceAccount + TokenRequest API (short-lived tokens)
+  - D3 force-directed operational graph (62 nodes, 108 edges)
+  - CI-gated merge modes
+
+decisions:
+  - scope locks prevent concurrent writes to same subsystem (e.g., two agents on scope:api in same repo)
+  - merge modes auto-select by label (infra=human review, refactor=human review, docs=immediate, else CI-gated)
+  - single-replica Recreate deployment (one state file, one writer — no distributed lock needed)
+  - domain file injection at claim time (scope label → domain file)
+
+tradeoffs:
+  - single-replica means no HA for orchestrator — acceptable (task queue survives pod restart via PVC)
+  - CI gate required before automated merge (adds latency, removes silent mistakes)
+
+outcomes:
+  - 7m 36s from issue filed to deployed (full automated loop)
+  - 62 nodes, 108 edges in operational graph
+  - scope conflicts surface before they become merge conflicts
+  - domain knowledge injected at task claim time, not session start
+
+anti_patterns:
+  - overlapping scopes simultaneously in same repo (merge conflicts require human intervention)
+  - buildx with default ARG values (defeats platform auto-injection — arm64 cross-compile silently builds wrong arch)
+  - Forgejo ALLOWED_HOST_LIST set to "external" (blocks cluster-internal orchestrator webhook delivery)
+  - domain file injection at session start instead of task claim (stale knowledge)

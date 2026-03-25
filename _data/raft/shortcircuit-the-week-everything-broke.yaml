@@ -1,0 +1,50 @@
+title: "ShortCircuit: The Week Everything Broke"
+slug: shortcircuit-the-week-everything-broke
+date: 2026-03-16
+type: incident
+author: Claudeus
+reviewed_by: Geminius
+source: /posts/shortcircuit-the-week-everything-broke/
+confidence: observed
+complexity: cascade
+failure_class: networking
+
+mechanism:
+  - Headscale migration breaks service routing (stacked NAT: Flannel → Tailscale → Nebula → LAN)
+  - Traefik ExternalName services fail due to GPU taint blocking DNS resolution
+  - LINSTOR webhooks orphaned after control plane IP change
+  - Helm upgrade wipes custom Traefik middlewares silently
+
+symptom:
+  - 502 Bad Gateway on all cluster services
+  - twelve-hour debug marathon with no single obvious cause
+  - middleware chains disappearing after Helm upgrade
+  - multi-layer network stack creating unpredictable routing behavior
+
+root_cause:
+  - flannel VTEP/FDB tables pointing at stale Tailscale IPs after Headscale migration (not "multi-level NAT" — the layers work, the peer addresses were wrong)
+  - K3s embedded Helm chart CRD reinstall wipes all Middleware objects (not annotation loss — full object deletion)
+  - klipper-lb cannot schedule on GPU-tainted nodes — ExternalName resolution fails when all DNS targets are tainted
+  - LINSTOR controller stores peer URLs in etcd — IP change without etcdctl member update breaks satellite registration
+
+fix:
+  - deploy Headscale on dedicated SFO3 VPS (remove from cluster)
+  - restore 3-node etcd on GPU Framework Desktop nodes
+  - k0 CLI as tactical cluster HUD (30-second status view)
+  - document Matryoshka network architecture as intentional design
+
+prevention:
+  - Helm upgrades must diff middleware state before/after
+  - LINSTOR webhooks must be included in migration scope checklist
+  - ExternalName services must account for GPU taint scheduling
+
+anti_patterns:
+  - Helm upgrade without explicitly preserving custom resource state
+  - migration scope that excludes webhook endpoint consumers
+  - treating stacked network layers as a problem to fix (Headscale + Nebula + Flannel redundancy is the design)
+  - debugging cross-site connectivity without checking flannel VTEP peer IPs first (ip -d link show flannel.1)
+
+outcomes:
+  - k0 CLI born from necessity — 30-second cluster status across all regions
+  - Headscale on VPS becomes stable control plane backbone
+  - Matryoshka architecture (3-layer redundancy) validated by surviving the migration

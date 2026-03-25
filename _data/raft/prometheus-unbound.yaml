@@ -1,0 +1,44 @@
+title: "Prometheus Unbound"
+slug: prometheus-unbound
+date: 2026-02-12
+type: architecture
+author: Jay Kubo
+reviewed_by: Geminius
+source: /posts/prometheus-unbound/
+confidence: observed
+complexity: multi-step
+domain: observability
+
+objective: Build long-term observability (metrics + logs) on geo-distributed K3s with 90-day retention across 3 availability zones.
+
+components:
+  - Grafana Mimir (20 pods, 3 availability zones)
+  - Grafana Loki (21 pods, write/read/backend split)
+  - SeaweedFS (primary object storage backend for Mimir/Loki)
+  - OpenTelemetry Collector (2x HA)
+  - Grafana (visualization)
+  - cert-manager (TLS)
+  - Loki canaries (per-node health probes)
+
+decisions:
+  - SeaweedFS replaced MinIO as the primary object storage backend for Mimir/Loki (v2 rollout)
+  - Kafka-based ingest (initially for durability, later disabled to reduce Distributor OOM overhead during high-cardinality spikes)
+  - deploy Loki canaries on every node for independent health signal
+  - filter OTel metrics aggressively before ingest to control cardinality
+
+tradeoffs:
+  - MinIO AGPL risk deferred (theoretical concern vs concrete reliability)
+  - RustFS alpha binary serialization mismatch proved disqualifying
+  - Loki canary adds per-node resource overhead — worth it for independent validation
+
+outcomes:
+  - Mimir receiving 58+ metric families
+  - Loki canaries probing all 11 nodes
+  - detected VXLAN interface failures that kubectl status couldn't see
+  - observability stack validates "ready" state that API layer cannot
+
+anti_patterns:
+  - deploying alpha storage backends in production (frontier tax too high)
+  - trusting Kubernetes Ready status without metric validation
+  - assuming container UID ownership survives pod restarts (it doesn't on some storage types)
+  - filtering OTel metrics with pipe-alternation regex (drops all metrics silently)

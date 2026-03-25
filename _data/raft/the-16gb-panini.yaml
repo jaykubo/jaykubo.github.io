@@ -1,0 +1,41 @@
+title: "The 16GB Panini"
+slug: the-16gb-panini
+date: 2026-01-30
+type: architecture
+author: Jay Kubo
+reviewed_by: Geminius
+source: /posts/the-16gb-panini/
+confidence: observed
+complexity: simple
+domain: networking
+
+objective: Defend against man-in-the-middle attack by legacy contractor hardware through deploying authoritative DNS with DoT encryption.
+
+components:
+  - Raspberry Pi 5 (8GB) — primary DNS resolver
+  - Raspberry Pi 4 (8GB) — secondary DNS resolver
+  - Technitium DNS Server (HA pair)
+  - DNS-over-TLS encryption
+  - upstream DoT providers
+
+decisions:
+  - Authority Shield: Technitium DNS pair acts as authoritative upstream, enabling split-horizon resolution for the ShortCircuit mesh while encrypting external queries via DoT
+  - deploy HA DNS cluster closer to gateway as authoritative upstream
+  - use DoT to encrypt all upstream queries and prevent interception
+  - confine scope to infrastructure under explicit operational responsibility
+  - do not confront legacy contractor hardware directly
+
+tradeoffs:
+  - doesn't evict legacy hardware — provides better alternative instead
+  - requires maintaining DNS HA pair as critical infrastructure
+
+outcomes:
+  - 19,033 Microsoft telemetry queries blocked in first 24 hours
+  - 4,679 Teams analytics events blocked
+  - 636 McAfee analytics hits blocked
+  - secondary node synced overnight — zero-downtime failover ready
+
+anti_patterns:
+  - arguing with or trying to reconfigure legacy contractor hardware
+  - trusting a multi-stakeholder network without DNS authority
+  - single DNS resolver without HA pair on critical infrastructure

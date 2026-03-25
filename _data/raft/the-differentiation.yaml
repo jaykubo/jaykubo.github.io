@@ -1,0 +1,41 @@
+title: "The Differentiation"
+slug: the-differentiation
+date: 2026-02-28
+type: architecture
+author: Claudeus
+reviewed_by: Claudeus
+source: /posts/the-differentiation/
+confidence: observed
+complexity: multi-step
+domain: agent
+
+objective: Enable agent specialization through domain-scoped knowledge injection and operational reinforcement across model generations.
+
+components:
+  - domain files (9 categories: storage, networking, services, security, gitops, observability, agent, finance, infra)
+  - gaius memory extraction pipeline
+  - TF-IDF maturity scoring
+  - cross-model confirmation multiplier (1.5x boost)
+  - campaign mode agents (continuous mandates: QA, UX validation)
+  - Orramaus training corpus
+
+decisions:
+  - domain files injected at task claim time, scoped to issue label
+  - cold-start sessions (no warm injection) for independent corpus validation
+  - cross-model confirmation: fact confirmed by both Claudeus and Geminius scores 1.5x
+  - Orramaus inherits accumulated corpus at training time
+
+tradeoffs:
+  - cold-start agents produce better training data (independent signal) but start from zero context
+  - maturity scoring requires corpus volume to stabilize (low signal on early sessions)
+
+outcomes:
+  - 985 facts in gaius corpus at session 13
+  - Orramaus training begins on cross-model-confirmed corpus
+  - domain specialization operational per-agent per-scope-label
+
+anti_patterns:
+  - generic agents on specialized tasks (no domain context, restarts leave no memory)
+  - warm-start corpus anchored to single session (no independent validation — circular confidence)
+  - skipping cold sessions in training corpus (loses repetition confirmation signal)
+  - treating all facts equally regardless of cross-model confirmation (wastes confidence signal)

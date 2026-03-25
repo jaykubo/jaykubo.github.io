@@ -1,0 +1,41 @@
+title: "Dead Reckoning"
+slug: dead-reckoning
+date: 2026-02-26
+type: architecture
+author: Jay Kubo
+reviewed_by: Claudeus
+source: /posts/dead-reckoning/
+confidence: observed
+complexity: simple
+domain: observability
+
+objective: Enable timeline scrubbing of historical aircraft positions from SeaweedFS archive with per-region union playback.
+
+components:
+  - SeaweedFS S3 (archive: adsb-raw/{region}/{date}/{HH-MM-SS})
+  - history listing API (timestamp enumeration per region)
+  - frontend scrubber bar (binary search for nearest timestamp)
+  - client-side merge/dedup by hex ID
+  - 150ms debounce on slider drag
+
+decisions:
+  - keep raw dump1090-fa JSON snapshots (no enrichment at archive time)
+  - client-side merge across 3 regions (deduplicate by ICAO hex)
+  - S3 key format lexicographically sortable (enables binary search)
+  - 1-minute timestamp cache for today's data, 1-hour cache for historical dates
+  - play button at 2-second cadence
+
+tradeoffs:
+  - historical data is unenriched (raw feeder only — no registration, aircraft type)
+  - client-side merge adds browser compute — acceptable at current scale
+
+outcomes:
+  - 17,280 snapshots per day archivable indefinitely
+  - scrubber covers full union timeline across 3 regions
+  - instant seek via binary search on sorted S3 keys
+
+anti_patterns:
+  - minio-go expects host:port format, not http:// URL prefix (silent TLS failure)
+  - auto-jumping to latest snapshot when entering history mode (overwrites live enrichment state)
+  - ListTimestamps hitting S3 on every request (add 1-minute cache for today)
+  - unsorted S3 keys (breaks binary search — use lexicographically sortable timestamps)

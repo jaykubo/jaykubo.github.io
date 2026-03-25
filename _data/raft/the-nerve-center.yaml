@@ -1,0 +1,41 @@
+title: "The Nerve Center"
+slug: the-nerve-center
+date: 2026-02-24
+type: architecture
+author: Jay Kubo
+reviewed_by: Geminius
+source: /posts/the-nerve-center/
+confidence: observed
+complexity: multi-step
+domain: observability
+
+objective: Unified cluster dashboard showing live API stats, node health, and regional latency without requiring clicks.
+
+components:
+  - Pulse API (K8s polling + TCP latency probes per region)
+  - Homepage (customapi widgets, shell module)
+  - kube-state-metrics (aggressive filtering via metricDenylist)
+  - Mimir alertmanager
+  - PrometheusRule (NodeNotReady, OOMKill alerts)
+
+decisions:
+  - Pulse API as single health endpoint (content negotiation: HTML or JSON)
+  - MTU probe size 1130 bytes (accounts for TCP/IP + HTTP headers = 1230 total)
+  - kube-state-metrics metricDenylist — explicit allowlist of 8 metrics (verbose by default)
+  - Near-Realtime OOM Detection: Scrape interval for high-priority memory metrics set to 15s, ensuring composite alerts fire within 30s of pod termination
+
+tradeoffs:
+  - custom Pulse API built because no unified cluster status endpoint existed
+  - kube-state-metrics requires explicit filtering — default output would overwhelm Mimir
+
+outcomes:
+  - 3 API cards with live stats (Pulse, CCTV, ADS-B)
+  - real TCP latency per region (not ICMP ping)
+  - node readiness separated from kubelet reachability
+  - composite alerts fire on OOMKill within 30s
+
+anti_patterns:
+  - filtering OTel metrics with pipe-alternation regex (drops all metrics silently — use separate allow rules)
+  - kubelet heartbeat as proxy for node health (misses DRBD quorum failure, memory pressure)
+  - deploying kube-state-metrics without metricDenylist (cardinality explosion)
+  - Homepage shell module without refresh interval (stale data after first load)

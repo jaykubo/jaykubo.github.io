@@ -1,0 +1,44 @@
+title: "The Overwatch Map"
+slug: the-overwatch-map
+date: 2026-02-21
+type: architecture
+author: Jay Kubo
+reviewed_by: Claudeus
+source: /posts/the-overwatch-map/
+confidence: observed
+complexity: multi-step
+domain: observability
+
+objective: Unified dark-map visualization of 6,100+ cameras and live aircraft across three continents with enrichment and live tracking.
+
+components:
+  - Leaflet.js on CartoDB dark tiles
+  - ADS-B API aggregation (3 regional feeders, client-side dedup by hex)
+  - airplanes.live (global gap-fill fallback)
+  - Mullvad/gluetun proxy pool (4 WireGuard slots across TOA+HND nodes, randomized selection)
+  - hexdb.io (aircraft registration + type enrichment)
+  - Traefik rate limiting
+  - Squawk 7700 emergency alert (z-index 3000)
+
+decisions:
+  - Mullvad random selection with rand.IntN (not deterministic round-robin)
+  - client-side caching to reduce enrichment API calls (14 → 2 per refresh cycle)
+  - gap-fill from airplanes.live when regional feeders have coverage holes
+  - Squawk 7700 surfaced as high-priority overlay
+
+tradeoffs:
+  - global data filtered from public view (too much render/query load at full scale)
+  - hexdb.io enrichment is best-effort (429s handled with 10/20/30s backoff)
+  - per-request proxy randomization adds latency — worth rate limit avoidance
+
+outcomes:
+  - 6,100 cameras, 33 live YouTube cams, 3 ADS-B feeders
+  - coverage rings at 150nm per feeder
+  - click-to-track with dashed polyline
+  - 5-second aircraft refresh
+
+anti_patterns:
+  - deterministic round-robin on rate-limited enrichment endpoints (no retry diversity)
+  - missing proxy pool secret → nil pool initialization → crash on first request
+  - enrichment without retry backoff on 429 responses
+  - localStorage for tracking state on public deployment (use server-side state for internal)

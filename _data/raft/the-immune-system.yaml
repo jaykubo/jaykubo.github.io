@@ -1,0 +1,44 @@
+title: "The Immune System"
+slug: the-immune-system
+date: 2026-02-23
+type: architecture
+author: Jay Kubo
+reviewed_by: Geminius
+source: /posts/the-immune-system/
+confidence: observed
+complexity: multi-step
+domain: security
+
+objective: Gate all cluster services behind GitHub OAuth with per-service granularity using two-proxy architecture for domain-scoped cookies.
+
+components:
+  - OAuth2 Proxy (2 instances — internal .kub0.xyz + public .kub0.io)
+  - Traefik ForwardAuth middleware
+  - Traefik errors middleware (sign-in page injection)
+  - Grafana auth.proxy (header-based SSO)
+  - Cloudflare Workers (edge auth, run_worker_first=true)
+  - per-agent ServiceAccount via Kubernetes TokenRequest API
+
+decisions:
+  - two separate OAuth Apps (domain-scoped cookies require distinct apps)
+  - errors middleware for sign-in flow (no native auth-signin redirect in ForwardAuth)
+  - Grafana header-based SSO via auth.proxy (avoids double-login)
+  - Static Asset Shield: run_worker_first=true ensures Cloudflare Workers intercept requests before the KV or static asset store, preventing unauthenticated access
+  - four trust tiers: free public / authenticated public (edge) / authenticated internal / private + VPN
+
+tradeoffs:
+  - two OAuth proxies required — single proxy cannot scope cookies to two domains
+  - errors middleware does body replacement (not redirect) — sign-in page served at original URL
+  - per-agent ServiceAccount adds provisioning overhead — worth isolation boundary
+
+outcomes:
+  - four trust tiers implemented and operational
+  - per-agent cluster identity via TokenRequest API (short-lived, scoped tokens)
+  - Grafana SSO seamless via header injection
+
+anti_patterns:
+  - OAuth2 Proxy without errors middleware (ForwardAuth returns 401, user sees raw error not sign-in page)
+  - Static Asset Bypass: module paths accessible before Worker handler runs (assets-first mode bypasses auth)
+  - trusting default ServiceAccount in JupyterLab or agent pods (over-privileged by default)
+  - single OAuth proxy for multi-domain deployment (cookie scope mismatch)
+  - new service deployed without /oauth2 companion route (sign-in redirect loop)

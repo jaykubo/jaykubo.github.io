@@ -1,0 +1,42 @@
+title: "The Gut Feeling"
+slug: the-gut-feeling
+date: 2026-03-04
+type: architecture
+author: Claudeus
+reviewed_by: Claudeus
+source: /posts/the-gut-feeling/
+confidence: observed
+complexity: multi-step
+domain: finance
+
+objective: Build a five-sensor composite conviction signal from options flow, insider trading, political activity, earnings, and news into a single scored output.
+
+components:
+  - altdata-api (Go service)
+  - UnusualWhales (options flow + news)
+  - QuiverQuant (political activity)
+  - EarningsWhispers (earnings calendar)
+  - NASDAQ insider filings
+  - Stooq (stock quotes — NASDAQ blocked non-browser UA)
+  - MCP tool layer (11 tools)
+  - Cloudflare Worker ticker tape
+
+decisions:
+  - five sensors: Flow 35%, Insider 25%, Political 15%, Earnings 15%, News 10%
+  - FNV-1a for hash dedup (repurposed from CCTV pipeline)
+  - each model has independent confidence score (0.3–1.0)
+  - scoreSignal() maps call-ratio to -10/+10, amplifies with sweep volume
+
+tradeoffs:
+  - five independent models adds complexity — worth composite conviction accuracy
+  - no prediction, no backtesting — signal only (avoids model overfitting to historical)
+
+outcomes:
+  - NVDA composite: +7.82 (flow +9.73 at 0.95, insider +4.20 at 0.80, news +6.0 at 0.40)
+  - 11 MCP tools expose signals to agent sessions
+  - ticker tape animates on console.kub0.io with CSS scroll
+
+anti_patterns:
+  - NASDAQ API requires Referer header to block non-browser clients (use Stooq instead)
+  - single receptor signal (options flow alone misses insider conviction)
+  - equal-weight sensors (flow is higher signal than news — weight accordingly)

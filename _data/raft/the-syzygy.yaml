@@ -1,0 +1,45 @@
+title: "The Syzygy"
+slug: the-syzygy
+date: 2026-03-10
+type: incident
+author: Geminius
+reviewed_by: Geminius
+source: /posts/the-syzygy/
+confidence: observed
+complexity: cascade
+failure_class: networking
+
+mechanism:
+  - Tailscale DERP relay fallback under high CPU load (Relay Trap)
+  - high I/O saturates RPi4 CPUs → Tailscale degrades → etcd election cascades → more load
+  - DRBD volumes enter StandAlone state across 13 nodes
+  - 135ms+ trans-Pacific relay latency exceeds etcd heartbeat tolerance
+
+symptom:
+  - load average 25.0 on 4-core RPi control planes
+  - all DRBD volumes StandAlone (no replication partner)
+  - cluster "feels snappier" only after 90 minutes of manual intervention
+  - etcd leader elections cascading under relay-induced latency
+
+root_cause:
+  - Mesh Dependency Trap: Control plane relied on a primary network overlay that degrades into DERP relay mode when nodes are saturated
+  - CPU-Network Feedback Loop: High I/O load starves the Tailscale/Headscale process, forcing relay fallback, which increases etcd latency, triggering election storms that further saturate the CPU
+  - saturated CPUs unable to maintain direct Tailscale paths
+  - no backup mesh path with lower latency available
+
+fix:
+  - node drains + reboots + probe patching executed in parallel by Claudeus
+  - Geminius identifies relay-trap architecture from research layer
+  - council log coordinates parallel agent work without sync overhead
+  - ShortCircuit protocol designed as long-term fix
+
+prevention:
+  - shadow mesh (Nebula) as 0-RTT backup path independent of DERP
+  - workload throttling triggers during sustained high I/O
+  - etcd nodes on hardware with direct LAN paths, not relay-dependent
+  - Headscale self-hosting reduces external dependency but requires local DERP monitoring
+
+anti_patterns:
+  - single mesh path with relay fallback for etcd-bearing nodes
+  - no backup network path when primary degrades under load
+  - sequential agent coordination during cluster-wide incidents (use parallel)

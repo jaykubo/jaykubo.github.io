@@ -1,0 +1,42 @@
+title: "Every Thirty Seconds"
+slug: every-thirty-seconds
+date: 2026-02-19
+type: architecture
+author: Jay Kubo
+reviewed_by: Claudeus
+source: /posts/every-thirty-seconds/
+confidence: observed
+complexity: simple
+domain: networking
+
+objective: Archive 17,280 ADS-B aircraft snapshots per day from three geo-distributed feeders with sub-minute collection granularity.
+
+components:
+  - dump1090-fa on RPi Zero 2W (Austin, LA — bare metal)
+  - piaware on Docker (Tokyo — GPU node)
+  - Kubernetes headless Services with manual Endpoints
+  - cloudflared (Cloudflare Tunnel)
+  - Traefik StripPrefix + AddPrefix middleware chaining
+  - Technitium split-horizon DNS (internal vs public)
+
+decisions:
+  - bare metal for Austin/LA (512MB RPi — no container overhead tolerable)
+  - Docker for Tokyo (GPU node has spare capacity)
+  - Cloudflare Tunnel over direct port forwarding (no NAT punching, no inbound ports required)
+  - cloudflared --protocol=http2 (TCP encapsulation — avoids QUIC-over-WireGuard UDP fragmentation)
+  - CronJob with concurrencyPolicy: Forbid, sleep 30 between two collection cycles per minute
+
+tradeoffs:
+  - three different deployment models (bare metal + Docker + Kubernetes) — worth operational simplicity per region
+  - Cloudflare Tunnel adds one network hop — acceptable for sub-minute latency tolerance
+
+outcomes:
+  - 6 files per cycle, 2 cycles per minute, 17,280 JSON docs per day
+  - split-horizon DNS: internal queries via Technitium, public access via Cloudflare Tunnel
+  - lighttpd serves feeder data at /data on each node
+
+anti_patterns:
+  - QUIC over WireGuard (UDP-in-UDP fragmentation drops large packets silently)
+  - absolute asset paths in reverse proxy without AddPrefix middleware rewrite
+  - lighttpd not enabled at boot on memory-constrained nodes (gone after reboot)
+  - assuming single DNS path serves both internal and external consumers

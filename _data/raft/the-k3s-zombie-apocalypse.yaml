@@ -1,0 +1,46 @@
+title: "The K3s Zombie Apocalypse"
+slug: the-k3s-zombie-apocalypse
+date: 2026-02-05
+type: incident
+author: Jay Kubo
+reviewed_by: Geminius
+source: /posts/the-k3s-zombie-apocalypse/
+confidence: observed
+complexity: multi-step
+failure_class: kubernetes
+
+mechanism:
+  - DRBD 8 vs DRBD 9 kernel module conflict
+  - MTU fragmentation through layered WireGuard tunnels
+  - etcd quorum degradation across trans-Pacific latency
+  - zombie CNI interfaces after node restarts
+
+symptom:
+  - nodes report Ready but pod-to-pod traffic fails
+  - Ansible playbook retries ("FAILED - RETRYING") with no clear error
+  - transient node blips during otherwise stable periods
+  - etcd leader election cascades from Tokyo control plane
+
+root_cause:
+  - kernel updated but system not rebooted — old DRBD 8 blocking new DRBD 9
+  - MTU 1500 bytes through 1280-byte Tailscale tunnel causes silent fragmentation
+  - 3-node etcd spanning Austin → Tokyo (7,000 miles) triggers leader election storms
+  - Kubelet lifecycle failure: Flannel interfaces persist across hard reboots without explicit garbage collection, causing IP conflicts
+
+fix:
+  - apt install linux-modules-extra-raspi (kernel module gap)
+  - manually kill zombie CNI interfaces
+  - set flannel MTU to 1230 (1280 Tailscale - 50 overhead)
+  - promote two additional nodes to control plane (5-node distributed etcd)
+
+prevention:
+  - enforce reboot after kernel upgrade in maintenance playbook
+  - separate MTU config per tunnel overlay layer
+  - distributed control planes with <100ms latency between majority
+  - etcd quorum must not span intercontinental links
+
+anti_patterns:
+  - trusting kubectl get nodes without checking kernel module state
+  - running 3-node etcd with majority across 7,000 miles of ocean
+  - MTU Blindness: Assuming nested tunnel stacks (Nebula over Tailscale/Headscale) will handle path MTU discovery without explicit clamping
+  - restarting services without rebooting after kernel update

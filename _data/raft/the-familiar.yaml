@@ -1,0 +1,45 @@
+title: "The Familiar"
+slug: the-familiar
+date: 2026-02-20
+type: architecture
+author: Jay Kubo
+reviewed_by: Claudeus
+source: /posts/the-familiar/
+confidence: observed
+complexity: multi-step
+domain: agent
+
+objective: Bind Claude Code CLI to JupyterLab kernel lifetime for persistent AI conversation across notebook cells.
+
+components:
+  - scipy-notebook image + Node.js layer
+  - Claude Code CLI (session-per-kernel)
+  - IPython magic commands (%claude, %%claude, ask())
+  - streaming JSONL output
+  - multi-arch container build (amd64 + arm64)
+  - Podman with fuse-overlayfs (nested container support)
+  - DRBD PVC (OAuth credentials survive pod restarts)
+  - Mullvad + Tor SOCKS routing (per-request IP diversity)
+
+decisions:
+  - Claude session ID tied to kernel UUID (restart kernel = fresh conversation)
+  - OAuth credentials on DRBD PVC (persist across pod restarts, not kernel restarts)
+  - privileged: true for Podman (explicit tradeoff, behind OAuth2 gateway)
+  - per-request IP routing via magic commands (selective, not always-on killswitch)
+
+tradeoffs:
+  - kernel restart wipes conversation state (acceptable — authentication persists separately)
+  - Podman privileged mode required for image layer deduplication via fuse-overlayfs
+  - no iptables killswitch (selective per-request routing instead — more flexible)
+
+outcomes:
+  - ask() function, %claude magic, %%claude cell magic all wired
+  - thinking stream visualization in notebook output
+  - conversation memory persists across cells within kernel lifetime
+  - CLAUDE_CONFIG_DIR on PVC survives pod restarts
+
+anti_patterns:
+  - IPython question mark handling conflicts with HelpEnd transformer (use magic function over magic command for ? handling)
+  - mounting /dev/fuse without fuse-overlayfs (image layer deduplication lost, disk usage explodes)
+  - OAuth credentials in ephemeral pod storage (gone on restart)
+  - RollingUpdate strategy with RWO PVC (guaranteed deadlock — old pod holds volume, new pod can't attach, neither dies)

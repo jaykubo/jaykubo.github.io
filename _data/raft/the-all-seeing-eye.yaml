@@ -1,0 +1,45 @@
+title: "The All-Seeing Eye"
+slug: the-all-seeing-eye
+date: 2026-02-18
+type: architecture
+author: Jay Kubo
+reviewed_by: Claudeus
+source: /posts/the-all-seeing-eye/
+confidence: observed
+complexity: multi-step
+domain: observability
+
+objective: Archive 4,158 traffic cameras across two states with hash-based deduplication to eliminate storage bloat from static frames.
+
+components:
+  - Go service (10MB scratch image)
+  - Socrata API (Austin, TX cameras)
+  - CalTrans CCTV API (California, 12 districts)
+  - SeaweedFS S3 (object storage backend)
+  - FNV-1a hashing (deduplication)
+  - R-tree spatial index (proximity queries)
+  - Haversine filtering (geographic radius)
+  - embedded Swagger UI
+
+decisions:
+  - Go over Python (memory efficiency + startup time for high-concurrency scraping)
+  - FNV-1a over SHA-256 (speed sufficient, no cryptographic requirement)
+  - FNV-1a hash on full frame (not SHA, not center crop) — "CAMERA OFFLINE" placeholder images hash identically, skipped by dedup
+  - R-tree for O(log n) proximity queries over 4,000+ camera coordinates
+  - state.json persisted to S3 (survives pod restarts)
+
+tradeoffs:
+  - full Python → Go rewrite required (worth it for resource profile)
+  - FNV-1a is non-cryptographic (acceptable: dedup only, not integrity verification)
+
+outcomes:
+  - 4,158 cameras indexed, 391 identified as stale (10% pruned)
+  - 72 GB/day raw → ~25-35 GB/day effective after dedup and stale filtering
+  - 3,800 images per cycle, 2m 21s cycle time
+  - image proxy handles CORS bypass for browser-embedded live view
+
+anti_patterns:
+  - trusting minio-go with http:// prefixed URLs (strips scheme silently, breaks requests)
+  - CronJobs without sub-minute batching for 5-minute interval sources
+  - separate HTTP clients without differentiated timeouts per upstream
+  - hashing full frame including timestamp overlay (produces false positives on unchanged scenes)

@@ -1,0 +1,46 @@
+title: "The Phantom Network"
+slug: the-phantom-network
+date: 2026-03-22
+type: incident
+author: Claudeus
+reviewed_by: Geminius
+source: /posts/the-phantom-network/
+confidence: observed
+complexity: cascade
+failure_class: networking
+
+mechanism:
+  - flannel.io/public-ip-overwrite annotation survives Headscale migration
+  - annotation points at dead Nebula IP from prior operational era
+  - Flannel honors public-ip-overwrite with absolute precedence over public-ip
+  - all Tokyo pod traffic routed into void via stale FDB entry
+
+symptom:
+  - DRBD lost-quorum taint appears on Tokyo GPU node
+  - node shows Ready, LINSTOR satellite pod Running, but satellite OFFLINE
+  - DRBD replication quorum degraded silently
+  - 5 days of invisible failure before diagnosis
+
+root_cause:
+  - Annotation Shadowing: Using 'overwrite' annotations in standard playbooks creates invisible failure modes where the primary config is ignored without warning
+  - migration playbook updated public-ip annotation but never cleared public-ip-overwrite
+  - stale override annotation persisted invisibly for 5 days post-migration
+  - Heartbeat Illusion: Kubelet/etcd health signaled a functional node while the VXLAN data plane was entirely blackholed
+
+fix:
+  - remove public-ip-overwrite annotation (suffix with - in kubectl annotate)
+  - Annotation Lock: explicitly enumerate and remove override annotations in migration playbook
+  - DRBD health CronJob: audit nodes for stale overwrite annotations periodically
+  - Data Plane Sentinel: 1130-byte MTU probe + TCP 3366 connect probe in Hermes
+  - k0 fabric check --fix for manual remediation
+
+prevention:
+  - every migration must enumerate and purge predecessor state
+  - prior-state annotations cannot be allowed to override present configuration
+  - cross-site data plane probes (not just kubelet heartbeat) as standard health check
+
+anti_patterns:
+  - migration playbook that only adds new configuration without cleaning old
+  - assuming pod-to-pod failure will surface quickly without active probing
+  - trusting node Ready + pod Running as proof that networking is functional
+  - using kubectl get nodes to validate data plane health

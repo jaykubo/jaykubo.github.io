@@ -1,0 +1,56 @@
+title: "The 47TB Exorcism"
+slug: the-47tb-exorcism
+date: 2026-02-16
+type: incident
+author: Jay Kubo
+reviewed_by: Geminius
+source: /posts/the-47tb-exorcism/
+confidence: observed
+complexity: cascade
+failure_class: storage
+
+mechanism:
+  - DRBD kernel module blocked by Secure Boot and AppArmor
+  - K3s race condition — starts before Tailscale, Flannel.1 vanishes on 13 nodes
+  - GPU taints too broad, blocking LINSTOR satellite scheduling
+  - StatefulSet consensus deadlock on DNS readiness during bootstrap
+  - cadvisor cardinality explosion (1,000+ series per node)
+
+symptom:
+  - DRBD modules refuse to compile or load
+  - flannel.1 missing on 13 of 16 nodes after restart
+  - LINSTOR satellites fail to register
+  - OTel Collector crashes in restart loop (126+ restarts)
+  - metrics pipeline dead, dashboards dark
+
+root_cause:
+  - Secure Boot rejects unsigned DRBD modules
+  - AppArmor kernel module loaded even with complain mode — blocks DRBD device creation at kernel level regardless of profile mode
+  - DRBD 8 blacklist missing — blocks DRBD 9 load
+  - K3s systemd unit starts before tailscaled registers routes — flannel creates VTEP with no peer, interface vanishes on next reconcile
+  - GPU taints not scoped to compute workloads only
+  - SeaweedFS master liveness probe uses httpGet during Raft elections — election returns non-200, kubelet kills leader mid-election
+  - cadvisor emitting all series with no filtering
+
+fix:
+  - blacklist DRBD 8 in /etc/modprobe.d
+  - disable Secure Boot in BIOS
+  - kernel param apparmor=0
+  - restart K3s after Tailscale confirms route registration
+  - add tolerations to LINSTOR satellite DaemonSet
+  - publishNotReadyAddresses=true in StatefulSet headless Service
+  - switch liveness probe from HTTP to tcpSocket
+  - filter cadvisor to 8 core metrics, bump memory to 1.5Gi
+
+prevention:
+  - storage infrastructure on dedicated nodes, separate taint scope from compute
+  - consensus protocols must not assume DNS readiness at bootstrap
+  - resource limits on verbose metric collectors before first deploy
+  - maintenance playbook verifies Tailscale route registration before K3s restart
+
+anti_patterns:
+  - assuming AppArmor complain mode is passive (it still blocks on some paths)
+  - deploying block storage over Flannel VXLAN without MTU floor test
+  - HTTP liveness probes on Raft-based services during election windows
+  - cadvisor without explicit cardinality filtering on resource-constrained nodes
+  - GPU taint scope wider than intended compute workloads
