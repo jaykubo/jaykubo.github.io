@@ -1,0 +1,60 @@
+title: "The Coin Flip Exorcism"
+slug: the-coin-flip-exorcism
+date: 2026-04-08
+type: incident
+author: Jay Kubo
+reviewed_by: Claudeus
+source: /posts/the-coin-flip-exorcism/
+confidence: observed
+complexity: multi-step
+domain: finance
+
+objective: Diagnose and fix a prediction market trading bot that showed 87% directional accuracy while losing $325, then align it with binary options theory and close the self-calibrating feedback loop.
+
+components:
+  - finint-executor (Go, ~8K LOC)
+  - updown_capture strategy (OTM binary options — positive gamma)
+  - itm_capture strategy (ITM binary options — negative gamma)
+  - GreeksCache (5min refresh, per-symbol + global, regime detection)
+  - GreeksAnalyzer (4h LLM cycle — Nemotron-Nano-30B via vLLM)
+  - Governor (15min settings reload from DB)
+  - Polymarket CLOB API + Binance CEX WebSocket
+  - Mullvad VPN proxy (replaced Tor)
+  - TimescaleDB (finint.signals, finint.trades, finint.settings)
+
+decisions:
+  - binary options Greeks with sign inversion (Γ/Θ negative for ITM, positive for OTM)
+  - TheoreticalEdge = N(d₂) − market_price (Black-Scholes binary call fair value vs CLOB ask)
+  - theo_edge NOT persisted to DB (derived metric requiring S/K/σ/T not stored per-signal)
+  - four self-calibrating methods replace static thresholds (LiveIVRVBand, LiveGammaLimit, LiveDeltaEdge, gamma-adjusted Kelly)
+  - LLM replaces grid search for macro parameter tuning (bounded ±20%/cycle, paramBounds map)
+  - cross-strategy analysis — Nemotron sees all 5 strategies simultaneously
+  - separate liveness from readiness probes (pod survives DB hiccups)
+  - fill simulator cap 85¢ → 99¢ (was discarding highest-confidence signals)
+
+tradeoffs:
+  - self-calibrating thresholds need 20+ resolved signals to activate (cold start = static defaults)
+  - LLM cannot toggle live/dead flags or dry_run_mode (bounded authority — human kill switch)
+  - regime detection uses flip rate heuristic (empirical, not theoretically optimal)
+  - gamma sign inversion means OTM and ITM strategies need entirely separate filter pipelines
+
+outcomes:
+  - pod restarts: 8/8h → 0 (liveness/readiness split)
+  - SKIP rate: 92% → <20% (fill simulator cap fix)
+  - orphaned signals: 6,432 cleaned (goroutine lifecycle fix)
+  - P&L visibility: $0.00 displayed → -$203 actual (Go JSON casing bug)
+  - latency: Tor 300-500ms → Mullvad 170ms
+  - signal quality: 50% WR coin-flip soup → sigma+odds gates filtering to viable corridor
+  - feedback loop closed: signal → Greeks → DB → aggregate → next signal (no human in loop)
+  - IV/RV band self-tightening toward win centroid when WR_favor >> WR_adverse
+  - gamma cap auto-engaging when |Γ_loss| > |Γ_win| × 1.3
+
+anti_patterns:
+  - unified liveness+readiness probe (DB timeout kills pod, destroys in-flight state)
+  - fill simulator sharing price cap with live execution (discards best signals)
+  - Go struct field casing mismatch between backend and frontend (PnL vs pnl — silent undefined)
+  - static IV/RV gate from papers (no relationship to actual market microstructure)
+  - grid search over 8 parameters (O(n⁸), timeouts, no causal reasoning, overfitting)
+  - running OTM and ITM strategies through same gamma filter (opposite sign = opposite behavior)
+  - routing trading API calls through Tor (300-500ms latency eats 10-20% of 2.7s arb window)
+  - measuring directional accuracy without measuring P&L (87% accuracy, -$325 wallet)
