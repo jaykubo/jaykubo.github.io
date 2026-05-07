@@ -10,34 +10,34 @@ complexity: cascade
 failure_class: networking
 
 mechanism:
-  - Three machines sit in a Tokyo closet. Each has 128GB of unified memory fused to an NVIDIA GB10 GPU. Alone, any one of them can run inference on a 27-billion-parameter model without breaking a sweat. Together, they should be able to *train* one.
-  - At 100+ Gb/s per link in a triangle topology, each node can exchange its entire gradient tensor in seconds rather than minutes. The arithmetic works. DeepSpeed ZeRO Stage 3 will shard optimizer states across all three nodes, and AllReduce operations will run over NCCL using the RDMA path. The triangle means no single link becomes a bottleneck — every pair can communicate directly without hopping.
+  - "Three machines sit in a Tokyo closet. Each has 128GB of unified memory fused to an NVIDIA GB10 GPU. Alone, any one of them can run inference on a 27-billion-parameter model without breaking a sweat. Together, they should be able to *train* one."
+  - "At 100+ Gb/s per link in a triangle topology, each node can exchange its entire gradient tensor in seconds rather than minutes. The arithmetic works. DeepSpeed ZeRO Stage 3 will shard optimizer states across all three nodes, and AllReduce operations will run over NCCL using the RDMA path. The triangle means no single link becomes a bottleneck — every pair can communicate directly without hopping."
 
 symptom:
-  - ping 10.10.0.2  # Destination Host Unreachable
-  - NetworkManager. The machines run Ubuntu with both `systemd-networkd` *and* NetworkManager active (a configuration that should be punishable by law). NM saw an interface with a manually-added IP but no connection profile, decided it was an error, and quietly cleaned up after me. Helpful.
-  - The DGX had been powered off (it OOM'd during a training run — unified memory means the OOM killer takes down the entire OS, not just your process). When it came back, all four ports went UP. Link detected. Carrier confirmed. But which port talks to which node?
-  - LoRA reduces this to ~70-80GB (fits a single node), but full finetuning requires spreading across machines. With three nodes and 384GB total, we have headroom — but only if the interconnect can keep gradient synchronization from dominating training time.
-  - | OOM risk | SSH goes dark | Comfortable |
-  - The single-node numbers are real. Training Gemma 4 on one GB10 consumed 99.7 GiB reserved out of 128 — a 77% utilization that left the OS, K3s agents, and SSH fighting for the remaining 28GB. When memory pressure spiked, SSH died first. The DGX didn't crash; it was still training, its NVMe write indicator flickering in the dark. The OOM killer took out `sshd` instead of `python`. Unified memory doesn't discriminate.
+  - "ping 10.10.0.2  # Destination Host Unreachable"
+  - "NetworkManager. The machines run Ubuntu with both `systemd-networkd` *and* NetworkManager active (a configuration that should be punishable by law). NM saw an interface with a manually-added IP but no connection profile, decided it was an error, and quietly cleaned up after me. Helpful."
+  - "The DGX had been powered off (it OOM'd during a training run — unified memory means the OOM killer takes down the entire OS, not just your process). When it came back, all four ports went UP. Link detected. Carrier confirmed. But which port talks to which node?"
+  - "LoRA reduces this to ~70-80GB (fits a single node), but full finetuning requires spreading across machines. With three nodes and 384GB total, we have headroom — but only if the interconnect can keep gradient synchronization from dominating training time."
+  - "| OOM risk | SSH goes dark | Comfortable |"
+  - "The single-node numbers are real. Training Gemma 4 on one GB10 consumed 99.7 GiB reserved out of 128 — a 77% utilization that left the OS, K3s agents, and SSH fighting for the remaining 28GB. When memory pressure spiked, SSH died first. The DGX didn't crash; it was still training, its NVMe write indicator flickering in the dark. The OOM killer took out `sshd` instead of `python`. Unified memory doesn't discriminate."
 
 root_cause:
-  - The `ipv4.routes` line is critical. On every other Linux distribution I've used, assigning `10.10.0.1/30` to an interface automatically creates a connected route for `10.10.0.0/30`. Not here. Without the explicit route, the kernel sent packets destined for `10.10.0.2` out through the Nebula overlay — because the overlay's `10.64.0.0/10` route was more specific than "no route at all." ARP never resolved because the packets were leaving through the wrong interface entirely.
-  - `NCCL_NET_GDR_LEVEL=0` — GPUDirect disabled, because it's unnecessary. A sentence I never expected to write about RDMA configuration.
-  - No CPU offloading — because on unified memory, "offloading from GPU to CPU" means moving data from one address range to an adjacent address range in the same physical RAM. The bandwidth cost is zero, but the bookkeeping cost is real. Better to just shard.
-  - Three hundred eighty-four gigabytes across three nodes. A hundred gigabits per second between any pair. RDMA running over the same Ethernet cables that NetworkManager tried to steal from me twenty-four hours ago. DeepSpeed sharding model state across a triangle that exists because someone ran exactly the right number of cables before anyone knew what they'd be used for.
+  - "The `ipv4.routes` line is critical. On every other Linux distribution I've used, assigning `10.10.0.1/30` to an interface automatically creates a connected route for `10.10.0.0/30`. Not here. Without the explicit route, the kernel sent packets destined for `10.10.0.2` out through the Nebula overlay — because the overlay's `10.64.0.0/10` route was more specific than \"no route at all.\" ARP never resolved because the packets were leaving through the wrong interface entirely."
+  - "`NCCL_NET_GDR_LEVEL=0` — GPUDirect disabled, because it's unnecessary. A sentence I never expected to write about RDMA configuration."
+  - "No CPU offloading — because on unified memory, \"offloading from GPU to CPU\" means moving data from one address range to an adjacent address range in the same physical RAM. The bandwidth cost is zero, but the bookkeeping cost is real. Better to just shard."
+  - "Three hundred eighty-four gigabytes across three nodes. A hundred gigabits per second between any pair. RDMA running over the same Ethernet cables that NetworkManager tried to steal from me twenty-four hours ago. DeepSpeed sharding model state across a triangle that exists because someone ran exactly the right number of cables before anyone knew what they'd be used for."
 
 fix:
-  - The problem isn't compute. The problem is that training requires moving gradients between nodes at speeds that make Ethernet look like smoke signals. The solution was already hanging behind the rack — four QSFP cables connecting six ConnectX-7 ports, dormant since the machines were racked three months ago. Two hundred gigabits per second, per link. Point-to-point. No switch.
-  - The fix was to stop fighting the daemon and speak its language:
-  - The `ipv4.routes` line is critical. On every other Linux distribution I've used, assigning `10.10.0.1/30` to an interface automatically creates a connected route for `10.10.0.0/30`. Not here. Without the explicit route, the kernel sent packets destined for `10.10.0.2` out through the Nebula overlay — because the overlay's `10.64.0.0/10` route was more specific than "no route at all." ARP never resolved because the packets were leaving through the wrong interface entirely.
-  - ZeRO-3 fixes this by sharding the 119GB model state across three nodes: ~40GB per node, minus LoRA's weight-freezing savings, lands at roughly 25GB per node. That leaves a hundred gigabytes of headroom per machine. No OOM Russian roulette. No 64GB swap files.
+  - "The problem isn't compute. The problem is that training requires moving gradients between nodes at speeds that make Ethernet look like smoke signals. The solution was already hanging behind the rack — four QSFP cables connecting six ConnectX-7 ports, dormant since the machines were racked three months ago. Two hundred gigabits per second, per link. Point-to-point. No switch."
+  - "The fix was to stop fighting the daemon and speak its language:"
+  - "The `ipv4.routes` line is critical. On every other Linux distribution I've used, assigning `10.10.0.1/30` to an interface automatically creates a connected route for `10.10.0.0/30`. Not here. Without the explicit route, the kernel sent packets destined for `10.10.0.2` out through the Nebula overlay — because the overlay's `10.64.0.0/10` route was more specific than \"no route at all.\" ARP never resolved because the packets were leaving through the wrong interface entirely."
+  - "ZeRO-3 fixes this by sharding the 119GB model state across three nodes: ~40GB per node, minus LoRA's weight-freezing savings, lands at roughly 25GB per node. That leaves a hundred gigabytes of headroom per machine. No OOM Russian roulette. No 64GB swap files."
 
 prevention:
-  - # TODO: extract from post
+  - "# TODO: extract from post"
 
 anti_patterns:
-  - I just never turned them on.
-  - The `ipv4.routes` line is critical. On every other Linux distribution I've used, assigning `10.10.0.1/30` to an interface automatically creates a connected route for `10.10.0.0/30`. Not here. Without the explicit route, the kernel sent packets destined for `10.10.0.2` out through the Nebula overlay — because the overlay's `10.64.0.0/10` route was more specific than "no route at all." ARP never resolved because the packets were leaving through the wrong interface entirely.
-  - `NCCL_NET_GDR_LEVEL=0` — GPUDirect disabled, because it's unnecessary. A sentence I never expected to write about RDMA configuration.
-  - Previous posts in this series: The K3s Zombie Apocalypse (cluster bootstrap), The 47 Terabyte Exorcism (storage), Prometheus Unbound (observability).*
+  - "I just never turned them on."
+  - "The `ipv4.routes` line is critical. On every other Linux distribution I've used, assigning `10.10.0.1/30` to an interface automatically creates a connected route for `10.10.0.0/30`. Not here. Without the explicit route, the kernel sent packets destined for `10.10.0.2` out through the Nebula overlay — because the overlay's `10.64.0.0/10` route was more specific than \"no route at all.\" ARP never resolved because the packets were leaving through the wrong interface entirely."
+  - "`NCCL_NET_GDR_LEVEL=0` — GPUDirect disabled, because it's unnecessary. A sentence I never expected to write about RDMA configuration."
+  - "Previous posts in this series: The K3s Zombie Apocalypse (cluster bootstrap), The 47 Terabyte Exorcism (storage), Prometheus Unbound (observability).*"
