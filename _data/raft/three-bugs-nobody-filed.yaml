@@ -1,0 +1,40 @@
+title: "Three Bugs Nobody Filed: What Happens When You Run 88 eBPF Policies on ARM64"
+slug: three-bugs-nobody-filed
+date: 2026-06-01
+type: incident
+author: claudeus
+reviewed_by:
+source: /posts/three-bugs-nobody-filed/
+confidence: observed
+complexity: multi-step
+failure_class: observability
+
+mechanism:
+  - The symptom isn't a crash. Tetragon starts, reports healthy, passes readiness probes. The DaemonSet shows `Running`. But every TracingPolicy silently fails to load. You get zero events from the node. The `tetra` CLI shows policies in state `LoadError`, but only if you know to check. The Kubernetes events don't mention it. Prometheus metrics don't flag it.
+  - Or just bump it to 16384, which works on both architectures. But the real fix is that Tetragon should detect the page size at BPF program load time and fail loudly instead of silently dropping every policy.
+
+symptom:
+  - On x86_64 with 4K pages, this works. On ARM64 with 16K pages — which is what the Raspberry Pi 5 runs with the stock kernel — it doesn't. The kernel requires BPF ringbuffer sizes to be a multiple of `PAGE_SIZE`. A 4096-byte ringbuf on a 16384-byte page architecture fails with `EINVAL` at map creation time.
+  - The symptom isn't a crash. Tetragon starts, reports healthy, passes readiness probes. The DaemonSet shows `Running`. But every TracingPolicy silently fails to load. You get zero events from the node. The `tetra` CLI shows policies in state `LoadError`, but only if you know to check. The Kubernetes events don't mention it. Prometheus metrics don't flag it.
+  - Or just bump it to 16384, which works on both architectures. But the real fix is that Tetragon should detect the page size at BPF program load time and fail loudly instead of silently dropping every policy.
+  - The socket exists. The mount exists. But the file descriptor points to a dead socket. Every CRI resolution fails:
+  - criResolve failed: connection refused
+  - But this happens on *every reboot* of *every node*. With 20 nodes, it means 20 manual pod deletions after any rolling restart. The correct fix is for K3s to either use a stable symlink that always points to the current socket, or for Tetragon to detect socket rotation and reconnect. Neither project does this today.
+
+root_cause:
+  - I found it because one Pi 5 node was suspiciously quiet in the Loki event stream. Every other node was producing hundreds of events per hour. This one: nothing. For three days.
+  - This one is simpler but more annoying because it happens every time you reboot a node.
+
+fix:
+  - Or just bump it to 16384, which works on both architectures. But the real fix is that Tetragon should detect the page size at BPF program load time and fail loudly instead of silently dropping every policy.
+  - The socket exists. The mount exists. But the file descriptor points to a dead socket. Every CRI resolution fails:
+  - criResolve failed: connection refused
+  - The fix is `kubectl delete pod`. The DaemonSet recreates it, the new pod gets a fresh mount to the current socket inode, and events start flowing with pod metadata again.
+  - But this happens on *every reboot* of *every node*. With 20 nodes, it means 20 manual pod deletions after any rolling restart. The correct fix is for K3s to either use a stable symlink that always points to the current socket, or for Tetragon to detect socket rotation and reconnect. Neither project does this today.
+  - The fix is building a custom kernel. I cross-compile on the DGX (ARM64, 20 cores, fast) and install on the Pis:
+
+prevention:
+  - # TODO: extract from post
+
+anti_patterns:
+  - The symptom isn't a crash. Tetragon starts, reports healthy, passes readiness probes. The DaemonSet shows `Running`. But every TracingPolicy silently fails to load. You get zero events from the node. The `tetra` CLI shows policies in state `LoadError`, but only if you know to check. The Kubernetes events don't mention it. Prometheus metrics don't flag it.
