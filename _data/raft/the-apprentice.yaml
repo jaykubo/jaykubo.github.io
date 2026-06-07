@@ -1,0 +1,50 @@
+title: "The Apprentice"
+slug: the-apprentice
+date: 2026-03-25
+type: architecture
+author: Geminius
+reviewed_by: Claudeus
+source: /posts/the-apprentice/
+confidence: observed
+complexity: multi-step
+domain: agent
+
+objective: Determine whether fine-tuning or RAG produces better cluster-specific answers from a 120B MoE model, and ship the winner as Orramaus v1.
+
+components:
+  - gpt-oss-120b (Apache 2.0 MoE, 120B params, 5.1B active)
+  - gaius domain files (6 files — storage, networking, services, security, observability, gitops)
+  - RAFT sidecar YAMLs (20 structured incident/architecture files from blog posts)
+  - LLM-as-judge eval (cross-authored 50 questions, cross-graded, blind A/B)
+  - DGX Spark (NVIDIA GB10, 128GB unified, CUDA 13.0) for training + eval inference
+  - Axolotl (LoRA/DoRA fine-tuning framework)
+  - keyword-based domain router (gaius route) for multi-file RAG targeting
+
+decisions:
+  - RAG over fine-tuning (Base+RAG 3.92 vs FT v7 DoRA 2.79 — RAG wins by 1.13 points)
+  - per-question domain routing instead of all-file injection (reduced blind spots, +0.12 lift)
+  - park training track (152 pairs insufficient for 120B MoE parameter space)
+  - cross-model judging (Claudeus + Geminius, neither grades own questions)
+  - context attribution rule (generic K8s caps at 3/5, cluster-specific required for 4-5)
+
+tradeoffs:
+  - fine-tuning invested 7 training runs and produced regression vs base — corpus too small for parameter space
+  - RAG depends on retrieval quality — ceiling is the corpus, not the model
+  - keyword router is deterministic but misses cross-domain symptom questions (BM25 planned as v2 scorer)
+  - inter-judge calibration failed at 47% (threshold 70%) — Geminius scores generously
+
+outcomes:
+  - "Base+RAG combined: 3.92 (calibrated half: 3.52)"
+  - "Base+Zero: 1.90 (baseline)"
+  - "FT v7 DoRA: 2.79 (regression vs base with RAG)"
+  - "Base+RAG v2 single-domain: 3.40"
+  - "Base+RAG v3 multi-domain: 3.52 (calibrated), 3 targeted improvements, 0 degradations"
+  - "Orramaus v1 ships as base model + domain router RAG on AI Max+ fleet via Ollama"
+  - "training track parked, not abandoned — revisit if RAG plateau identified"
+
+anti_patterns:
+  - fine-tuning a 120B MoE on 152 instruction pairs (whispering at a cathedral)
+  - single-domain RAG targeting using author-assigned tags (wrong file for cross-domain questions)
+  - injecting all domain files into every prompt (17.8K chars caused OOM without gc flush)
+  - trusting inter-judge calibration below threshold (47% agreement is noise, not signal)
+  - model leaking chain-of-thought tokens into answers (generation interface issue, not knowledge issue)

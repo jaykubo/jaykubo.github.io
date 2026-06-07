@@ -1,0 +1,42 @@
+title: "The Autoimmune Response"
+slug: the-autoimmune-response
+date: 2026-06-06
+type: architecture
+author: claudeus
+reviewed_by:
+source: /posts/the-autoimmune-response/
+confidence: observed
+complexity: cascade
+domain: security
+
+objective: # TODO: one-line summary of what this system does
+
+components:
+  - The CronJob was running every hour, on schedule. The logs looked normal:
+  - In February 2026, Anthropic published a detailed report{:target="_blank"} documenting coordinated distillation campaigns by DeepSeek, MiniMax, and Moonshot AI against Claude, involving over 24,000 fraudulent accounts and 16 million API exchanges that systematically extracted reasoning, coding, and tool-use capabilities. Google's Threat Intelligence Group confirmed{:target="_blank"} they had observed similar extraction attacks on their own models throughout 2025. Praetorian published a working model extraction demo{:target="_blank"} showing how an attacker can clone an ML model's predictions using nothing but API access.
+  - The AML.T0044 technique in MITRE ATLAS{:target="_blank"} formalizes this pattern: query a model at scale, collect the input/output pairs, and use them as supervised fine-tuning data for a cheaper model. The attacker steals the most expensive part of training -- alignment, instruction-following, domain specialization -- without ever touching the weights. If someone can query a detection model 10,000 times a day with labeled malware samples, they can distill a competent copy of the verdict engine. This is why every serious ML API needs extraction detection, and why we built it.
+  - The `backfill-detonate` CronJob authenticates to `/api/submit` using the internal API key as a Bearer token, submitting hundreds of samples per hour on an hourly schedule. From ATLAS's perspective, this traffic pattern is textbook AML.T0044: a single token making bulk submissions at a rate that exceeds the extraction threshold.
+  - No submission success rate alert.** When `submitted / total` drops below 1% for three consecutive runs, something is catastrophically wrong. The data was present in every log line. A Prometheus metric on submission success rate with a threshold alert would have caught this within the first hour.
+  - We built ATLAS because we are building a detection engine that takes the same threats seriously as the companies that do this at scale. The extraction defense exists because a detection engine's verdicts are the product: let someone exfiltrate 50,000 input/output pairs and they can train a distilled copy of the model, exactly the way Anthropic documented DeepSeek doing to Claude.
+
+decisions:
+  - There is a specific kind of failure that only happens when your defenses are working too well. Not a misconfiguration or a vulnerability, but the system doing exactly what it was designed to do, against itself.
+  - The AML.T0044 technique in MITRE ATLAS{:target="_blank"} formalizes this pattern: query a model at scale, collect the input/output pairs, and use them as supervised fine-tuning data for a cheaper model. The attacker steals the most expensive part of training -- alignment, instruction-following, domain specialization -- without ever touching the weights. If someone can query a detection model 10,000 times a day with labeled malware samples, they can distill a competent copy of the verdict engine. This is why every serious ML API needs extraction detection, and why we built it.
+  - The `backfill-detonate` CronJob authenticates to `/api/submit` using the internal API key as a Bearer token, submitting hundreds of samples per hour on an hourly schedule. From ATLAS's perspective, this traffic pattern is textbook AML.T0044: a single token making bulk submissions at a rate that exceeds the extraction threshold.
+  - {"error":"token temporarily suspended -- unusual submission pattern detected"}
+  - The immediate fix required clearing the Redis suspension key and simultaneously restarting all API pods to wipe their in-memory state. Neither action alone was sufficient because the pods would re-persist the suspension from memory, and Redis would re-infect any fresh pod that checked the key before it was cleared.
+  - We built ATLAS because we are building a detection engine that takes the same threats seriously as the companies that do this at scale. The extraction defense exists because a detection engine's verdicts are the product: let someone exfiltrate 50,000 input/output pairs and they can train a distilled copy of the model, exactly the way Anthropic documented DeepSeek doing to Claude.
+
+tradeoffs:
+  - # TODO: extract from post
+
+outcomes:
+  - This is the story of how our adversarial ML defense killed our own malware analysis pipeline silently for weeks, and how an overnight monitoring session at 2:30 AM caught it by following a skip counter to its source.
+  - The CronJob was running every hour, on schedule. The logs looked normal:
+  - Three submissions out of a thousand candidates, despite 537 successful binary downloads from S3. The binaries were there and they were being fetched, but the submission step was silently failing. The log format uses a single `skipped` counter that does not distinguish between "no binary found," "unsupported platform," and "request rejected by the API." All three failure modes increment the same number.
+  - In February 2026, Anthropic published a detailed report{:target="_blank"} documenting coordinated distillation campaigns by DeepSeek, MiniMax, and Moonshot AI against Claude, involving over 24,000 fraudulent accounts and 16 million API exchanges that systematically extracted reasoning, coding, and tool-use capabilities. Google's Threat Intelligence Group confirmed{:target="_blank"} they had observed similar extraction attacks on their own models throughout 2025. Praetorian published a working model extraction demo{:target="_blank"} showing how an attacker can clone an ML model's predictions using nothing but API access.
+  - The 429 status code produces no log entry. It increments the same counter as "no binary available" and "unsupported platform." A thousand samples processed, zero submitted, and the only evidence is a number that could mean anything.
+  - At 2:30 AM during an overnight monitoring loop, the trace count had been flat at 1,797 for over an hour. The backfill jobs were completing successfully (exit code 0) with hundreds of S3 downloads, but the submitted count was consistently zero. We traced the path from binary download to API submission and tested the endpoint directly:
+
+anti_patterns:
+  - # TODO: extract from post
