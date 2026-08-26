@@ -47,7 +47,7 @@ Tokyo, Japan · <a href="https://linkedin.com/in/jaykubo">linkedin.com/in/jaykub
 
 <a class="resume-dl" href="/assets/Jay_Kubo_Resume.pdf">Download PDF</a>
 
-Applied AI architect in Tokyo. A decade advising Japanese enterprises from inside Google Cloud, CrowdStrike, and Rakuten—now building agent orchestration and LLM evaluation on a 20-node cluster across four sites. Native Japanese and English, technical register.
+I build and run security and AI systems on infrastructure I operate myself — a 20-node Kubernetes cluster across four sites — and for a decade have been the technical-and-business bridge between Japanese enterprises and the cloud platforms they run on, inside Google Cloud, CrowdStrike, and Rakuten. Native Japanese and English, technical register.
 
 ## EXPERIENCE
 
@@ -55,68 +55,60 @@ Applied AI architect in Tokyo. A decade advising Japanese enterprises from insid
 
 **Tokyo, Japan** | Jul 2020 - Present
 
-#### Agent Orchestration
+#### Infrastructure & Security
 
-- Claude Code distills work to Grok Build workers under kernel sandboxes; a write needs a YubiKey grant. Done is a re-run predicate, not the worker's self-report.
-- The same hard gates ship in the executor image as a deterministic PreToolUse hook: warn mode first, then flipped to enforce on the executor pods; the orchestrator's own dispatch-time check is the next stage.
-- Claude Code TUI status line for remaining context (advisory); same on Grok sessions. Gaius as a Claude Code plugin (OSS, PyPI, MCP). ~30 skills, including a scoped-diff security audit that stays inside the context window.
-- Project Gaius: 10,000+ facts from Claude and Gemini sessions. 98.6% retrieval hit@10 on LongMemEval-S, offline, no GPU.
+- 20-node Kubernetes cluster across Austin, Los Angeles, Torrance, and Tokyo — ~1 TB GPU memory, 47 TB DRBD-replicated block storage, WireGuard mesh, Ansible-driven lifecycle behind per-node drain gates. Migrated the whole overlay network live, with zero downtime on active workloads.
+- Rebuilt ingress for site-level failure: one Traefik replica per site, required anti-affinity by zone. A full-site outage now shifts traffic to the other two automatically, no manual re-pin.
+- Tetragon eBPF as a DaemonSet: 97 TracingPolicies covering ~131 MITRE ATT&CK and 22 ATLAS techniques. vigiles-probe, a Rust eBPF sensor with a BPF_LSM enforcement hook, does live deny-list enforcement across all 20 nodes. Filed the upstream Ubuntu kernel bug (LP#2150798) that unblocks BPF_LSM on arm64 for Tetragon, Tracee, Falco, and KubeArmor.
+- CI/CD gate that blocks a merge when a protected host has no OAuth2 companion route, failing closed on any manifest it can't parse. Every control is pinned by a case that must fail and a near-miss that must pass.
+- Found a class of alert that passes review and can never fire — one compared a value to zero where the value is always zero; another ran as a job with no database password, so it never evaluated. Neither failed a test. Coverage counts only after a proven red run, not a green pipeline.
+- Packaged the platform for GCP Marketplace: Helm chart, RS256 JWT licensing, free tier to 10 nodes and a per-node Pro tier above it. Ran the evaluation end to end on GKE — 47 policies loaded, sub-second enforcement — then priced the tiers against it. Google Cloud Partner Advantage member; approved in Anthropic's Cyber Verification Program.
 
-#### Evaluation
+#### AI Systems
 
-- LLM-as-judge (base, RAG, fine-tuned) across two model lineages. Fine-tune scored 2.79 vs RAG 3.92, so I shipped RAG. Judge agreement measured 47% against a 70% bar, so I shipped on the margin, not the grade.
-- Found alerts that passed review and could never fire (always-zero compare; missing credential). Adversarial harness: 85 detected, 5 bypassed, all test debt.
-
-#### Platform
-
-- Packaged Kubernetes security product for GCP Marketplace (Helm, GKE). Approved in Anthropic's Cyber Verification Program.
-- Daily kube-bench (k3s-cis-1.9) into a CIS posture API: living hardening state, not a one-time audit.
-- Cross-compiled a custom ARM64 kernel with BPF_LSM, absent from the stock kernel, to run eBPF enforcement on ARM nodes.
-- 20-node Kubernetes cluster, Austin, Los Angeles, Torrance, Tokyo. Ansible, WireGuard, ~1 TB GPU memory, 47 TB DRBD-replicated block (NVMe + SATA). OpenTelemetry/Grafana, two-proxy OAuth2. Site outage shifts traffic automatically.
-- vLLM serving Gemma, Qwen, and an embedding model on AMD ROCm and NVIDIA CUDA. LoRA fine-tuning on a DGX Spark.
+- MALINT: an end-to-end malware pipeline — intake against a benign baseline, YARA static analysis, sandboxed detonation under gVisor with Tetragon capture, then a confidence-gated model verdict served on a vLLM inference fabric (AMD ROCm and NVIDIA CUDA) with LoRA fine-tuning on a DGX Spark. ~50,000 samples, ~86,000 behavioral signatures.
+- LLM-as-judge evaluation with a 2×2 factorial design (base vs. fine-tuned, zero-shot vs. RAG) to separate the retrieval lift from the fine-tuning lift instead of claiming both. Fine-tune scored 2.79 vs RAG 3.92, so I shipped RAG.
+- Project Gaius, open source on PyPI: hybrid semantic and keyword retrieval over 10,000+ facts behind a 7-tool MCP server. 98.6% retrieval hit@10 on LongMemEval-S (ICLR 2025), matching the published same-model baseline offline, no GPU.
 
 ### Technical Advisor, Japan Deluxe Tours, Inc.
 
 **Remote** | May 2015 - Present
 
-- Claude in production for their staff: a Google Chat bot that answers operations questions and ships approved changes, gated by Google Groups roles (admin vs staff) and logged. The same roles gate ChatOps merges and experimental features.
-- Recommended and stood up their first AWS cloud in 2015. Cut RDS cost ~50% while still on AWS. Migrated the customer site to Cloudflare Workers and on-prem Kubernetes.
-- MySQL 8.0 on NVMe with GTID replication, two streaming replicas at 0 s lag.
-- Stripe payments (deposits and self-service balance, no stored card). Sign in with Apple and Google on the customer site.
-- Legacy staff tooling behind Cloudflare Access. Staff Macs on Tailscale; FleetDM for inventory and CVE.
+*Ten years on one enterprise account — first cloud, migration, production operations, and the business case renewed at every step.*
+
+- Recommended and stood up their first AWS cloud in 2015, then took over the full stack when the original developer left. Migrated the customer site to Cloudflare Workers and on-premises Kubernetes; MySQL 8.0 on NVMe with GTID replication, streaming replicas across three sites at 0 s lag.
+- Translate goals into a roadmap and present the tradeoffs and the cost case to owners who are not technical, then the same case in engineering terms to whoever has to build it. Every expansion of scope over ten years — cloud, Kubernetes, payments, endpoint security — was argued and approved that way.
+- Claude in production for their staff: a Google Chat bot that answers operations questions and ships approved changes, gated by directory roles and logged end to end. Stripe payments (deposits and self-service balance, no stored card); staff Macs on Tailscale with Santa binary authorization and FleetDM for inventory, compliance, and CVE response.
 
 ### Associate Analyst, CrowdStrike (Falcon Complete Japan)
 
 **Austin, TX** | Jan 2025 - May 2025
 
-- Japanese-language translator on high-priority Falcon Complete Japan escalations—analysts and senior analysts pulled me in, and what I wrote is what went out. Also worked with a GovCloud senior analyst on Japan commercial-cloud operations.
-- Claude workflow for Japanese customer responses (SLA docs, JIRA, Confluence). Daily threat-intel feeds and ~30 SOC automations the team kept.
+- Japanese-language translator on high-priority Falcon Complete escalations — analysts and senior analysts pulled me in, and what I wrote is what went out to the customer.
+- ~30 JavaScript automations for Falcon and internal SOC tooling: bulk hash extraction, one-click VirusTotal submission, polling where a customer package had no native alert. One captured a file from a host online for under 60 seconds on a ticket open for days — evidence manual work would not have gotten. The team adopted the library immediately and kept using it after the layoff.
+- Curated daily threat-intelligence feeds and trained a GovCloud senior analyst to run Japan commercial-cloud operations alone.
 
 ### Application Support Analyst, EPAM Systems (Google Cloud)
 
 **Austin, TX** | Nov 2019 - Mar 2021
 
-- Frontline support for Japanese enterprise customers on Google Cloud, customer-facing under Google: BigQuery, Dataflow, Cloud Composer, Cloud Spanner, Cloud SQL, App Engine, Dialogflow. Gaming, e-commerce, rail, trading houses, telecom, retail, banking.
-- Bridged U.S. and Japan on high-priority escalations. Chrome extension cut Platinum P0/P1 SLA misses to near zero.
-- Carried Won't Fix rulings back to enterprise customers; moved stalled private cases to the public tracker.
-- Filed P2s in Google Issue Tracker from those accounts, including: Cloud SQL export blocked for viewer IAM, Dataproc fluentd leak on the master until OOM, billing accounts missing in Console, Cloud SDK output drift between Python 2 and 3.
+- Frontline support for Japanese enterprise customers on Google Cloud, customer-facing under Google: BigQuery, Dataflow, Cloud Composer, Cloud Spanner, Cloud SQL, App Engine, Dialogflow. Gaming, e-commerce, rail, trading houses, telecom, banking.
+- Bridged U.S. and Japan on high-priority escalations. A Chrome extension I built cut Platinum P0/P1 SLA misses to near zero. Carried Won't Fix rulings back to enterprise customers; moved stalled private cases onto the public tracker.
+- Filed P2s from those accounts into Google's issue tracker: Cloud SQL export blocked for viewer IAM, a Dataproc fluentd leak that ran the master to OOM, billing accounts missing from Console.
 
 ### Security Engineer & Data Analyst, Rakuten
 
 **San Mateo, CA** | Sep 2015 - Jul 2018
 
-- Created an internal vulnerability-intelligence platform to collect, search, alert, and visualize CVEs in real time. Sold across subsidiaries (Ebates, Slice, Buy.com, Linkshare). Whitebox and blackbox pentests for the same brands.
-- Kafka pipeline: Palo Alto PAN-OS syslog into Elasticsearch. Authored the company MySQL and Oracle security standards from CIS benchmarks, across thousands of instances. On-call DBA for 100+ Japan-region services (~5,000 VMs).
-- Azure pipelines and DOMO dashboards. A/B and multivariate tests in Oracle Maxymiser across six markets. 4-month OJT with the Rakuten HQ data-science team in Tokyo (CNN product-image matching, OpenCV, Chainer).
-- Led Rakuten's first PII/SPII sweep for GDPR compliance, embedded with the DBA team as a dual post across the company's full database landscape. Coordinated with thousands of internal teams, much of it in Japanese.
+- On-call DBA on a 24×7 rotation for 100+ Japan-region services, roughly 5,000 VMs. Authored the company MySQL and Oracle security standards from CIS benchmarks across thousands of instances, with continuous compliance-audit tooling behind them.
+- Built an internal vulnerability-intelligence platform to collect, search, alert on, and visualize CVEs in real time. Sold it across subsidiaries — Ebates, Slice, Buy.com, Linkshare — alongside whitebox and blackbox penetration tests for the same brands.
+- Led Rakuten's first PII/SPII sweep for GDPR across the full database landscape, coordinating with thousands of internal teams, much of it in Japanese.
 
 ## EDUCATION
 
 <div class="rows">
 <p>B.A., Mathematics and Computer Science (Courant Institute) · <span class="who">New York University</span> · <span class="when">May 2015</span></p>
 </div>
-
-Coursework: Artificial Intelligence · Algorithmic Problem Solving · Database Systems (Courant, graduate) · Mathematics of Finance · Meaning of Leadership (Wagner) · Digital Marketing and Social Media Analytics (Stern)
 
 ## CERTIFICATIONS
 
@@ -149,8 +141,12 @@ PyPI [`gaius-memory`](https://pypi.org/project/gaius-memory/) · Ubuntu kernel b
 
 **Spoken languages:** Japanese (native; business and technical) · English (native; business and technical)
 
-**AI:** Claude API · Claude Code · Grok Build · Gemini · RAG · LLM-as-judge eval · vLLM · LoRA · MCP · Python · Go
+**Security:** eBPF/BPF_LSM · Tetragon · detection engineering and validation · YARA · malware detonation and sandboxing (gVisor) · penetration testing · vulnerability management (NVD, CISA KEV, EPSS) · threat intelligence · osquery · Santa · CrowdStrike Falcon
 
-**Cloud:** GCP (BigQuery, Dataflow, Cloud Composer, Cloud Spanner, Cloud SQL, GKE, Marketplace, Dialogflow) · AWS · Azure · Kubernetes · Ansible · OpenTelemetry/Grafana
+**AI systems:** agents and tool calling · MCP servers · RAG and hybrid retrieval · LLM evaluation (LLM-as-judge) · LoRA fine-tuning · vLLM (ROCm and CUDA)
 
-**Security:** Linux · eBPF · YubiKey · endpoint · threat intelligence · penetration testing
+**Cloud & infrastructure:** GCP (BigQuery, Dataflow, Spanner, Cloud SQL, GKE, Marketplace) · AWS · Azure · Cloudflare · Kubernetes/K3s · Docker · Helm · Ansible · MySQL · PostgreSQL · OpenTelemetry/Grafana
+
+**Programming:** Python · Go · Rust · JavaScript · Bash · SQL
+
+**Customer work:** discovery with executives and practitioners · POC and evaluation design · demos and workshops · escalation management under SLA
