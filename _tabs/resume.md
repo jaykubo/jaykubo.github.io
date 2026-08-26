@@ -58,7 +58,7 @@ Applied AI architect in Tokyo. A decade advising Japanese enterprises from insid
 #### Agent Orchestration
 
 - Claude Code distills work to Grok Build workers under kernel sandboxes; a write needs a YubiKey grant. Done is a re-run predicate, not the worker's self-report.
-- The same hard gates ship in the executor image as a deterministic PreToolUse hook, warn mode first: designed as a staged rollout, enforce flag not yet flipped.
+- The same hard gates ship in the executor image as a deterministic PreToolUse hook: warn mode first, then flipped to enforce on the executor pods; the orchestrator's own dispatch-time check is the next stage.
 - Claude Code TUI status line for remaining context (advisory); same on Grok sessions. Gaius as a Claude Code plugin (OSS, PyPI, MCP). ~30 skills, including a scoped-diff security audit that stays inside the context window.
 - Project Gaius: 10,000+ facts from Claude and Gemini sessions. 98.6% retrieval hit@10 on LongMemEval-S, offline, no GPU.
 
