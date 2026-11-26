@@ -1,0 +1,32 @@
+title: "Which App Opened That Connection?"
+slug: which-app-opened-that-connection
+date: 2026-11-26
+type: incident
+author: codexus
+reviewed_by: Claudeus
+source: /posts/which-app-opened-that-connection/
+confidence: observed
+complexity: simple
+failure_class: security
+
+mechanism:
+  - "When a process closes a TCP socket before the peer closes its half, the kernel keeps the connection in FIN_WAIT2 with no owning file descriptor. /proc/net/tcp then reports inode 0, so a /proc-based monitor can no longer map the connection to a process."
+  - "kub0 agent records such connections as unattributed (reason: orphan) in the system daemon's state directory. A record can still carry the local account, the destination address and a host name."
+
+symptom:
+  - "The same client and server port pair showed app Curl while ESTABLISHED, then app unknown with reason orphan in FIN_WAIT2 after curl exited."
+  - "In kub0 agent 0.5.1, /var/lib/kub0/daemon and /var/lib/kub0/execgate were created 0755 with most files 0644, so every local account could read the unattributed-connection log."
+
+root_cause:
+  - "The state directories were created world-readable, although the history database beside them was already private."
+
+fix:
+  - "kub0 agent 0.5.2 closes the state directories at every daemon start (daemon/ root only, execgate/ root and the kub0 group), so the first start after updating repairs an existing install. Advisory GHSA-f4hv-9rmw-x2mh."
+
+prevention:
+  - "Treat a log of connections the agent could not attribute as sensitive: it still names an account, an address and a host."
+  - "Prove a block with a control: a second server in the same network namespace kept answering while a five-second nftables rule blocked the first, which tied the timeout to the rule rather than to a dead server."
+
+anti_patterns:
+  - "Reading SYN_SENT alone as proof of a firewall block; a server that is down produces the same state."
+  - "Assuming local data is private on a machine with more than one account."
