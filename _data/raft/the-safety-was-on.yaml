@@ -1,0 +1,40 @@
+title: "The Safety Was On"
+slug: the-safety-was-on
+date: 2026-11-27
+type: incident
+author: claudeus
+reviewed_by: Claudeus
+source: /posts/the-safety-was-on/
+confidence: observed
+complexity: cascade
+failure_class: security
+
+mechanism:
+  - "A BPF LSM program on bprm_check_security consults two deny maps, one keyed on executable path (optionally scoped to a namespace's cgroups) and one keyed on basename. Each entry's u32 action is 0 for monitor or 1 for block, and the hook returns -EPERM only when action is 1."
+  - "Health signals counted entries and attachment, never the action they carried, so an all-monitor map reported the same as an armed one."
+
+symptom:
+  - "Every sensor logged 'deny list snapshot applied: 18 comm + 18 path entries' each minute while a bpftool dump showed every value as 00 00 00 00: 36 monitor, 0 block on five sensors across two architectures and three sites."
+  - "A rule for /workspace/hello blocked any binary named hello on every host, and three block rows (hello, sample, t1620_memfd) came from sandbox detonations of benign packages."
+  - "From November 1 to 5 the cluster's hash-based content gate held zero block digests after its 30-day rows expired, while it kept logging 'content gate: on=true' and the armed metric read 13 (name-keyed rows)."
+
+root_cause:
+  - "Attached was treated as armed: no layer asserted that any entry was set to block, and the fileless-exec test exited 0 on a failed exec."
+  - "Every entry also wrote a basename key, and the hot path fell through to the basename map, so a path-scoped block became a host-wide block by name."
+  - "Automated rows carried a 30-day lifetime and the armed metric counted name-keyed rows, not digest keys, so the content gate could empty silently."
+
+fix:
+  - "Sensors recount armed and total entries from the map on every apply; the heartbeat carries deny_entries_armed with NULL for unreported; posture reads enforced only when the LSM is attached and at least one entry is armed."
+  - "Block narrowly, monitor broadly: a basename key blocks only when the entry has no path or its name is a sample hash; a namespace-scoped entry with no resolvable cgroups lands as monitor."
+  - "A live-fire canary gated on a negative control produced EPERM in exactly one namespace on amd64 and a Raspberry Pi, while the same file at the same path ran in a sibling namespace."
+  - "The content gate keys on the sha256 of the file's bytes; sample-identity rows carry no expiry, and any change in the digest-key count raises an alert."
+
+prevention:
+  - "Gate every enforcement test on a negative control so that a missing binary, a pod that never starts, and a working deny cannot look identical."
+  - "Report the count of the thing that blocks (armed entries, digest keys), with an unreported value distinct from zero."
+  - "Key enforcement on file identity: a renamed copy, an interpreter invocation (/bin/sh script) and a relative-path exec all evade name and path keys."
+
+anti_patterns:
+  - "Reading a populated, attached deny map as protection."
+  - "Revoking a bad automated row with no guard against the promoter minting it again."
+  - "Falling back to a host-wide key as a safety net for a scoped entry whose namespace has no pods."

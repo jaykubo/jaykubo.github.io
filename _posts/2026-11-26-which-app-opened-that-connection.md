@@ -58,3 +58,5 @@ The history database already had restricted permissions. Beside it, though, the 
 In v0.5.2 the system daemon restricts that directory to root on startup. The first start after upgrading also fixes permissions on an existing installation. If you already use the plugin, update it and choose **Install kub0** again to get the [updated daemon](https://github.com/kub0-ai/kub0-agent/releases/tag/v0.5.2){:target="_blank"}.
 
 “Which app opened that connection?” got me looking at the socket. The marketplace review left me with a second question. Once the connection is gone, who gets to look it up?
+
+*Next: [The Safety Was On](/posts/the-safety-was-on/) follows the canary that tested whether kub0 could stop an executable.*
