@@ -19,7 +19,7 @@ symptom:
   - "From November 1 to 5 the cluster's hash-based content gate held zero block digests after its 30-day rows expired, while it kept logging 'content gate: on=true' and the armed metric read 13 (name-keyed rows)."
 
 root_cause:
-  - "Attached was treated as armed: no layer asserted that any entry was set to block, and the fileless-exec test exited 0 on a failed exec."
+  - "Monitor mode was deliberate (detonations must run to completion so the full attack is recorded), but every health signal treated attached as armed: posture called the all-monitor fleet protected, no layer asserted that any entry was set to block, and the fileless-exec test exited 0 on a failed exec."
   - "Every entry also wrote a basename key, and the hot path fell through to the basename map, so a path-scoped block became a host-wide block by name."
   - "Automated rows carried a 30-day lifetime and the armed metric counted name-keyed rows, not digest keys, so the content gate could empty silently."
 

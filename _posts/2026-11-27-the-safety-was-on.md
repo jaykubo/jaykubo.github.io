@@ -1,7 +1,7 @@
 ---
 title: "The Safety Was On"
 date: 2026-11-27 14:22:25 +0900
-description: "A deny list loaded on every node that could not deny anything, the canary that finally made it fire, and why the desktop agent keys on file hashes instead of names."
+description: "A deny list we kept in monitor mode on purpose while every dashboard called it protection, the canary that proved it could fire, and why the desktop agent keys on file hashes instead of names."
 categories:
   - Security
   - Infrastructure
@@ -26,9 +26,13 @@ deny list snapshot applied: 18 comm + 18 path entries
 
 On all five sensors we checked, every one of those entries said `monitor`.
 
-The sensor's enforcement half is a BPF LSM program hooked into `bprm_check_security`, consulting a deny list before any binary is allowed to execute. The list comes from the malware pipeline: a sample gets detonated in a sandbox, the verdict engine judges it, and if the evidence is strong enough a row lands on the deny list and gets pushed to every sensor. The LSM was attached. The maps were populated. The snapshot was fresh. Every dashboard we had called that "protected."
+The sensor's enforcement half is a BPF LSM program hooked into `bprm_check_security`, consulting a deny list before any binary is allowed to execute. The list comes from the malware pipeline: a sample gets detonated in a sandbox, the verdict engine judges it, and if the evidence is strong enough a row lands on the deny list and gets pushed to every sensor.
 
-This is the story of how that deny path reported itself loaded when it wasn't, what it took to make it actually fire, and why the thing we finally shipped to a desktop, the [kub0 agent](https://github.com/kub0-ai/kub0-agent){:target="_blank"}, keys on something completely different from what the cluster started with.
+That every row said `monitor` was deliberate. The cluster detonates malware in order to watch it, and a sensor that blocks at the first suspicious step cuts the recording short: the beaconing, the persistence and the lateral movement never happen, and the verdict engine never sees a whole attack. Detection ran in monitor mode by policy, and after an over-broad block rule in August (more on that below) the deny list stayed there too.
+
+What wasn't deliberate was everything that reported on it. The LSM was attached. The maps were populated. The snapshot was fresh. Every dashboard we had called that "protected."
+
+This is the story of how a deny path we had chosen to leave watching reported itself as protection, what it took to make it actually fire, and why the thing we finally shipped to a desktop, the [kub0 agent](https://github.com/kub0-ai/kub0-agent){:target="_blank"}, keys on something completely different from what the cluster started with.
 
 ## What the Map Said
 
@@ -51,13 +55,13 @@ pub struct DenyValue {
 }
 ```
 
-Both maps held 18 entries each, and all five sensors we sampled, across both CPU architectures and three sites, gave the same count: 36 monitor, 0 block. The kernel only returns `-EPERM` when `action == 1`. The BPF LSM deny path could not deny anything.
+Both maps held 18 entries each, and all five sensors we sampled, across both CPU architectures and three sites, gave the same count: 36 monitor, 0 block. The kernel only returns `-EPERM` when `action == 1`. As configured, the BPF LSM deny path could not deny anything. That was the policy. Nothing that reported on it said so.
 
 **A populated map reads exactly like an armed one.** The snapshot log counted entries. It never said what they were set to.
 
-## Why Nothing Caught It
+## Why Nothing Could Tell
 
-Every layer we had built to catch exactly this stayed green. The fileless-exec test exited 0 on a failed exec, so a real deny would have passed too. The build pipeline never executed a denied binary, and none of the unit tests asserted `EPERM`. The red-team runner designed for this was suspended, and it counted "detected but not blocked" as success. The enforcement-lost alert fired only when the hook failed to attach, so an attached hook with an all-monitor map looked healthy. The sensor did report `lsm_capable` and `lsm_active` separately. What we lacked was the third axis: attached is not armed.
+None of our checks could tell monitor from block. Had we meant the list to block, nothing would have told us it didn't. The fileless-exec test exited 0 on a failed exec, so a real deny would have passed too. The build pipeline never executed a denied binary, and none of the unit tests asserted `EPERM`. The red-team runner designed for this was suspended, and it counted "detected but not blocked" as success. The enforcement-lost alert fired only when the hook failed to attach, so an attached hook with an all-monitor map looked healthy. The sensor did report `lsm_capable` and `lsm_active` separately. What we lacked was the third axis: attached is not armed.
 
 We also had to correct the opposite claim. "The deny path has never been live-fire tested" turned out to be half wrong. A Tetragon `Sigkill` on `sys_clone` had been live on this cluster once, and it did kill: it blocked every KubeVirt VM from being created, which is why that policy's clone selectors only observe now. The kill mechanism was proven. It was proven by an outage, which is not the kind of proof you go looking for twice.
 
@@ -101,7 +105,7 @@ The second run:
 
 The result that convinced us was in a sibling namespace. On the same node, while the entry was armed, we executed the identical file at the identical path from a second throwaway namespace. It ran. Same kernel, same LSM program, same bytes. The only difference was the cgroup the process lived in. A scoped entry's basename key is held at monitor, and its path key carries the target namespace's cgroups, so outside that namespace nothing matches at block. A deny that fires everywhere proves the hook works. A deny that fires in exactly one namespace and nowhere else proves the *scope* works, and the `hello` incident was the proof that we hadn't had that before.
 
-That was the first deny we had ever observed from the fleet's BPF LSM path. Six days later the automated promoters were allowed to arm their own rows.
+That was the first deny we had ever observed from the fleet's BPF LSM path. The fleet went back to monitor afterwards, by the same policy as before. Six days later the automated promoters were allowed to arm their own rows.
 
 ## What It Actually Stops
 
